@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy import text
 
 # Load environment variables from .env file
 load_dotenv()
@@ -34,3 +35,26 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def ensure_delivery_agent_columns():
+    """
+    Ensure the delivery_agents table has the nullable columns added by recent model changes.
+
+    This runs idempotent ALTER TABLE ... ADD COLUMN IF NOT EXISTS statements.
+    It's a pragmatic, non-destructive approach for development/hackathon environments
+    when Alembic migrations aren't set up.
+    """
+    # Use engine.begin() so the statements run in a transaction
+    with engine.begin() as conn:
+        # Add kerberos_id and background_check_status if missing
+        conn.execute(
+            text(
+                "ALTER TABLE IF EXISTS public.delivery_agents ADD COLUMN IF NOT EXISTS kerberos_id VARCHAR;"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE IF EXISTS public.delivery_agents ADD COLUMN IF NOT EXISTS background_check_status VARCHAR;"
+            )
+        )

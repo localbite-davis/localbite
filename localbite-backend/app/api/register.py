@@ -6,6 +6,10 @@ from app.schemas.restaurant import RestaurantCreate, RestaurantOut
 from app.schemas.delivery_agent import DeliveryAgentCreate, DeliveryAgentOut
 from app.models.delivery_agent import AgentType
 from uuid import uuid4
+import logging
+import traceback
+
+logger = logging.getLogger("app.register")
 
 # Import CRUD functions
 from app.crud import users as crud_users
@@ -55,11 +59,18 @@ def register_delivery_agent(payload: DeliveryAgentCreate, db: Session = Depends(
     # If email belongs to UC Davis, automatically mark agent as student and verified and
     # generate a mock kerberos_id to simulate Kerberos integration.
     if email_lower.endswith("@ucdavis.edu"):
+        # Ensure student-specific fields are present so Pydantic validation passes
+        # even if the frontend didn't include them.
+        u_name = getattr(payload, "university_name", None) or "UC Davis"
+        s_id = getattr(payload, "student_id", None) or f"ucd_{int(uuid4().int % 10_000_000)}"
+
         updated_payload = payload.model_copy(update={
             "agent_type": AgentType.STUDENT,
             "is_verified": True,
             "kerberos_id": str(uuid4()),
             "background_check_status": None,
+            "university_name": u_name,
+            "student_id": s_id,
         })
     else:
         # Non-UC Davis emails are treated as third-party; require background check
@@ -71,9 +82,12 @@ def register_delivery_agent(payload: DeliveryAgentCreate, db: Session = Depends(
         })
 
     try:
+        logger.info("Registering delivery agent email=%s agent_id=%s", updated_payload.email, updated_payload.agent_id)
         created = crud_delivery_agent.create(db=db, payload=updated_payload)
+        return created
     except Exception as e:
-        # Handle DB errors cleanly
+        # Log full traceback server-side for debugging, but return a safe HTTP error
+        tb = traceback.format_exc()
+        logger.error("Error creating delivery agent: %s\n%s", e, tb)
+        # Include the error message in the HTTP response detail to help the frontend debug in dev.
         raise HTTPException(status_code=500, detail=str(e))
-
-    return created
