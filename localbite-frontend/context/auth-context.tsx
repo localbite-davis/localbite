@@ -68,9 +68,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsAuthLoading(false)
 
       }
-      finally {
-        setIsAuthReady(true)
-      }
     }
 
     verifySession()
