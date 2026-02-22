@@ -10,19 +10,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Suspense } from "react"
 
-// Full roles
-const roles: {
-  value: UserRole
-  label: string
-  icon: typeof UtensilsCrossed
-  description: string
-}[] = [
+const roles: { value: UserRole; label: string; icon: typeof UtensilsCrossed; description: string }[] = [
   { value: "customer", label: "Student", icon: UtensilsCrossed, description: "Order food from Davis restaurants" },
   { value: "agent", label: "Delivery Agent", icon: Bike, description: "Deliver food and earn money" },
   { value: "restaurant", label: "Restaurant", icon: Store, description: "Manage orders and grow your business" },
 ]
 
-// Only for delivery agent types
 const agentTypes = ["Student Agent", "Professional Agent"]
 
 function SignupForm() {
@@ -31,16 +24,14 @@ function SignupForm() {
   const preselectedRole = searchParams.get("role") as UserRole | null
 
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(
-    preselectedRole && roles.some((r) => r.value === preselectedRole)
-      ? preselectedRole
-      : null
+    preselectedRole && roles.some((r) => r.value === preselectedRole) ? preselectedRole : null
   )
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [studentId, setStudentId] = useState("")
   const [agentType, setAgentType] = useState(agentTypes[0])
-  const [showPassword, setShowPassword] = useState(false)
+  const [showPassword, setShowPassword] = useState<boolean>(false) // ✅ explicitly boolean
 
   const handleSignup = (e: React.FormEvent) => {
     e.preventDefault()
@@ -54,9 +45,7 @@ function SignupForm() {
       {!selectedRole ? (
         <div className="animate-slide-up">
           <h1 className="text-2xl font-bold text-foreground">Create account</h1>
-          <p className="mb-8 mt-2 text-muted-foreground">
-            Choose how you want to use Aggie Bites
-          </p>
+          <p className="mb-8 mt-2 text-muted-foreground">Choose how you want to use Aggie Bites</p>
           <div className="space-y-3">
             {roles.map((role) => (
               <button
@@ -122,7 +111,6 @@ function SignupForm() {
               />
             </div>
 
-            {/* Student ID for students */}
             {selectedRole === "customer" && (
               <div className="space-y-2">
                 <Label htmlFor="studentId">Student ID</Label>
@@ -138,7 +126,6 @@ function SignupForm() {
               </div>
             )}
 
-            {/* Agent type dropdown for delivery agents */}
             {selectedRole === "agent" && (
               <div className="space-y-2">
                 <Label htmlFor="agentType">Agent Type</Label>
@@ -162,7 +149,7 @@ function SignupForm() {
               <div className="relative">
                 <Input
                   id="password"
-                  type={showPassword ? "text" : "password"}
+                  type={showPassword ? "text" : "password"} // ✅ safe
                   placeholder="Create a password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -171,7 +158,7 @@ function SignupForm() {
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
+                  onClick={() => setShowPassword((prev) => !prev)} // ✅ safe boolean
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -196,40 +183,4 @@ function SignupForm() {
   )
 }
 
-export default function SignupPage() {
-  return (
-    <div className="flex min-h-screen">
-      {/* Left Panel */}
-      <div className="hidden flex-1 flex-col justify-between bg-primary p-12 lg:flex">
-        <div className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent">
-            <UtensilsCrossed className="h-5 w-5 text-accent-foreground" />
-          </div>
-          <span className="text-xl font-bold text-primary-foreground">AggieBites</span>
-        </div>
-        <div>
-          <h2 className="text-balance text-4xl font-bold leading-tight text-primary-foreground">
-            Join the Aggie Bites community.
-          </h2>
-          <p className="mt-3 text-pretty text-lg text-primary-foreground/70">
-            Whether you are hungry, want to earn, or run a restaurant -- we have got you covered on campus.
-          </p>
-        </div>
-        <p className="text-sm text-primary-foreground/50">&copy; 2026 Aggie Bites</p>
-      </div>
-
-      {/* Right Panel */}
-      <div className="flex flex-1 items-center justify-center bg-background p-6 lg:p-12">
-        <Suspense
-          fallback={
-            <div className="flex items-center justify-center">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-            </div>
-          }
-        >
-          <SignupForm />
-        </Suspense>
-      </div>
-    </div>
-  )
-}
+export default SignupPage
