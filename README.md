@@ -52,3 +52,41 @@ This will launch:
 Once the backend is running, you can access the interactive API docs at:
 - Swagger UI: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc
+
+## Base Fare Recommendation API
+
+New endpoint:
+
+- `POST /api/v1/fares/recommendation`
+
+Purpose:
+
+- Calculates `base_fare` (minimum bidding fare for delivery agents)
+- Returns `eta_estimate_minutes`
+
+Payload supports either:
+
+- `distance_km` from your distance API, or
+- coordinates for both user and restaurant (`latitude`/`longitude`) to compute distance with Haversine.
+
+Example request body:
+
+```json
+{
+  "user_location": {
+    "address": "500 1st St, Davis, CA",
+    "latitude": 38.5449,
+    "longitude": -121.7405
+  },
+  "restaurant_location": {
+    "address": "220 G St, Davis, CA",
+    "latitude": 38.5435,
+    "longitude": -121.7407
+  },
+  "incentive_metrics": {
+    "demand_index": 1.1,
+    "supply_index": 0.9,
+    "weather_severity": 0.1
+  }
+}
+```

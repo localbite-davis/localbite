@@ -7,6 +7,13 @@ from .delivery_agent import (
     DeliveryAgentOut,
 )
 from .payments import PaymentBase, PaymentCreate, PaymentUpdate, PaymentOut
+from .fare import (
+    LocationInput,
+    IncentiveMetrics,
+    FareRecommendationRequest,
+    FareBreakdown,
+    FareRecommendationResponse,
+)
 
 __all__ = [
     "RestaurantBase",
@@ -25,4 +32,9 @@ __all__ = [
     "PaymentCreate",
     "PaymentUpdate",
     "PaymentOut",
+    "LocationInput",
+    "IncentiveMetrics",
+    "FareRecommendationRequest",
+    "FareBreakdown",
+    "FareRecommendationResponse",
 ]
