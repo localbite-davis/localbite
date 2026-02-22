@@ -26,8 +26,8 @@ export default function PaymentSuccessPage() {
       if (isAuthenticated && user) {
         setStatus("success")
         
-        // Redirect immediately (no delay)
-        router.push("/dashboard/customer")
+        // Redirect immediately to cart (no delay)
+        router.push("/dashboard/customer/cart")
         return
       }
       
@@ -40,7 +40,7 @@ export default function PaymentSuccessPage() {
       // Otherwise wait for auth to initialize
       setStatus("success")
       setTimeout(() => {
-        router.push("/dashboard/customer")
+        router.push("/dashboard/customer/cart")
       }, 1000)
     }
 
@@ -96,13 +96,13 @@ export default function PaymentSuccessPage() {
           Your order has been confirmed and is now being prepared
         </p>
         <p className="text-sm text-muted-foreground">
-          Redirecting to your orders...
+          Redirecting to your cart...
         </p>
         <Button
-          onClick={() => router.push("/dashboard/customer")}
+          onClick={() => router.push("/dashboard/customer/cart")}
           className="w-full rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
         >
-          Return to Dashboard
+          Return to Cart
         </Button>
       </div>
     </div>

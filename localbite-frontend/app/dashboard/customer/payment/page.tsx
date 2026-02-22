@@ -27,11 +27,13 @@ export default function PaymentPage() {
       try {
         if (!user?.id) {
           setError("User information not available")
+          setPaymentReady(true) // Set ready even on error to show error message
           return
         }
 
         if (!orderId) {
           setError("Order ID not found. Please place an order first.")
+          setPaymentReady(true) // Set ready even on error to show error message
           return
         }
 
@@ -72,11 +74,28 @@ export default function PaymentPage() {
         setPaymentReady(true)
       } catch (err) {
         setError("Failed to initialize payment")
+        setPaymentReady(true) // Set ready even on error to show error message
       }
     }
 
-    if (orderId && user?.id) {
-      initPayment()
+    if (orderId) {
+      if (user?.id) {
+        initPayment()
+      } else {
+        // Wait a bit for user to load
+        const timer = setTimeout(() => {
+          if (!user?.id) {
+            setError("User information not available")
+            setPaymentReady(true)
+          } else {
+            initPayment()
+          }
+        }, 1000)
+        return () => clearTimeout(timer)
+      }
+    } else {
+      setError("Order ID not found. Please place an order first.")
+      setPaymentReady(true)
     }
   }, [orderId, amountParam, user?.id])
 
