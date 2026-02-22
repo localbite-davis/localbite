@@ -1,14 +1,35 @@
 "use client"
 
-import { use } from "react"
+import { use, useEffect, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { restaurants } from "@/lib/mock-data"
 import { useCart } from "@/app/dashboard/customer/layout"
 import { Star, Clock, MapPin, ArrowLeft, Plus, Minus, ShoppingCart } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { useState } from "react"
+
+const API_URL = "http://localhost:8000/api/v1"
+
+interface Restaurant {
+  id: number
+  name: string
+  cuisine_type: string
+  // Mapped/Mocked fields
+  image: string
+  rating: number
+  reviewCount: number
+  eta: string
+  deliveryFee: number
+}
+
+interface MenuItem {
+  menu_id: number
+  item_name: string
+  price: number
+  description?: string
+  category: string
+  popular?: boolean
+}
 
 export default function RestaurantDetailPage({
   params,
@@ -16,15 +37,70 @@ export default function RestaurantDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = use(params)
-  const restaurant = restaurants.find((r) => r.id === id)
   const { addItem, items } = useCart()
-  const [addedIds, setAddedIds] = useState<string[]>([])
+  const [addedIds, setAddedIds] = useState<number[]>([])
+  
+  const [restaurant, setRestaurant] = useState<Restaurant | null>(null)
+  const [menu, setMenu] = useState<MenuItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
 
-  if (!restaurant) {
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch Restaurant
+        const resRest = await fetch(`${API_URL}/restaurants/${id}`)
+        if (!resRest.ok) throw new Error("Restaurant not found")
+        const dataRest = await resRest.json()
+
+        setRestaurant({
+          ...dataRest,
+          image: "https://images.unsplash.com/photo-1552566626-52f8b828add9?w=800&q=80",
+          rating: 4.5,
+          reviewCount: 128,
+          eta: "20-30 min",
+          deliveryFee: 1.99,
+        })
+
+        // Fetch Menu
+        // Note: The backend endpoint might serve list by restaurant_id
+        // Try /menu/restaurant/{id} based on previous checks
+        const resMenu = await fetch(`${API_URL}/menu/restaurant/${id}`)
+        if (resMenu.ok) {
+          const dataMenu = await resMenu.json()
+          setMenu(dataMenu)
+        } else {
+          console.warn("Could not fetch menu")
+          setMenu([])
+        }
+
+      } catch (err) {
+        console.error(err)
+        setError("Could not load restaurant details.")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (id) {
+      fetchData()
+    }
+  }, [id])
+
+
+  if (loading) {
+     return (
+        <div className="flex h-64 items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        </div>
+     )
+  }
+
+  if (error || !restaurant) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
         <p className="text-lg font-medium text-foreground">
-          Restaurant not found
+          {error || "Restaurant not found"}
         </p>
         <Link href="/dashboard/customer">
           <Button variant="outline" className="mt-4 rounded-xl">
@@ -35,22 +111,23 @@ export default function RestaurantDetailPage({
     )
   }
 
-  const categories = [...new Set(restaurant.menu.map((m) => m.category))]
+  // Group menu by category. Handle items with no category.
+  const categories = Array.from(new Set(menu.map((m) => m.category || "Uncategorized")))
 
-  const handleAdd = (item: (typeof restaurant.menu)[0]) => {
+  const handleAdd = (item: MenuItem) => {
     addItem({
-      id: item.id,
-      restaurantId: restaurant.id,
+      id: item.menu_id.toString(),
+      restaurantId: restaurant.id.toString(),
       restaurantName: restaurant.name,
-      name: item.name,
+      name: item.item_name,
       price: item.price,
     })
-    setAddedIds((prev) => [...prev, item.id])
-    setTimeout(() => setAddedIds((prev) => prev.filter((i) => i !== item.id)), 800)
+    setAddedIds((prev) => [...prev, item.menu_id])
+    setTimeout(() => setAddedIds((prev) => prev.filter((i) => i !== item.menu_id)), 800)
   }
 
-  const getItemQuantity = (itemId: string) => {
-    return items.find((i) => i.id === itemId)?.quantity || 0
+  const getItemQuantity = (itemId: number) => {
+    return items.find((i) => i.id === itemId.toString())?.quantity || 0
   }
 
   return (
@@ -77,7 +154,7 @@ export default function RestaurantDetailPage({
             {restaurant.name}
           </h1>
           <p className="mt-1 text-primary-foreground/80">
-            {restaurant.cuisine}
+            {restaurant.cuisine_type}
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-primary-foreground/90">
             <span className="flex items-center gap-1">
@@ -97,80 +174,86 @@ export default function RestaurantDetailPage({
       </div>
 
       {/* Menu */}
-      {categories.map((cat) => (
-        <section key={cat}>
-          <h2 className="mb-3 text-lg font-semibold text-foreground">{cat}</h2>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {restaurant.menu
-              .filter((m) => m.category === cat)
-              .map((item) => {
-                const qty = getItemQuantity(item.id)
-                const justAdded = addedIds.includes(item.id)
-                return (
-                  <div
-                    key={item.id}
-                    className="group flex items-center justify-between rounded-2xl border border-border bg-card p-4 transition-all hover:shadow-md"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-medium text-card-foreground">
-                          {item.name}
-                        </h3>
-                        {item.popular && (
-                          <Badge
-                            variant="secondary"
-                            className="rounded-md text-[10px]"
-                          >
-                            Popular
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {item.description}
-                      </p>
-                      <p className="mt-2 font-semibold text-card-foreground">
-                        ${item.price.toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="ml-4">
-                      {qty > 0 ? (
+      {menu.length === 0 ? (
+         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border p-12 text-center text-muted-foreground">
+            <p>No menu items available for this restaurant yet.</p>
+         </div>
+      ) : (
+        categories.map((cat) => (
+            <section key={cat}>
+            <h2 className="mb-3 text-lg font-semibold text-foreground">{cat}</h2>
+            <div className="grid gap-3 sm:grid-cols-2">
+                {menu
+                .filter((m) => (m.category || "Uncategorized") === cat)
+                .map((item) => {
+                    const qty = getItemQuantity(item.menu_id)
+                    const justAdded = addedIds.includes(item.menu_id)
+                    return (
+                    <div
+                        key={item.menu_id}
+                        className="group flex items-center justify-between rounded-2xl border border-border bg-card p-4 transition-all hover:shadow-md"
+                    >
+                        <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-foreground">
-                            {qty} in cart
-                          </span>
-                          <Button
+                            <h3 className="font-medium text-card-foreground">
+                            {item.item_name}
+                            </h3>
+                            {item.popular && (
+                            <Badge
+                                variant="secondary"
+                                className="rounded-md text-[10px]"
+                            >
+                                Popular
+                            </Badge>
+                            )}
+                        </div>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            {item.description || "No description available"}
+                        </p>
+                        <p className="mt-2 font-semibold text-card-foreground">
+                            ${item.price.toFixed(2)}
+                        </p>
+                        </div>
+                        <div className="ml-4">
+                        {qty > 0 ? (
+                            <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-foreground">
+                                {qty} in cart
+                            </span>
+                            <Button
+                                size="icon"
+                                className={`h-9 w-9 rounded-xl transition-all ${
+                                justAdded
+                                    ? "bg-accent text-accent-foreground"
+                                    : "bg-primary text-primary-foreground"
+                                }`}
+                                onClick={() => handleAdd(item)}
+                            >
+                                <Plus className="h-4 w-4" />
+                            </Button>
+                            </div>
+                        ) : (
+                            <Button
                             size="icon"
+                            variant="outline"
                             className={`h-9 w-9 rounded-xl transition-all ${
-                              justAdded
-                                ? "bg-accent text-accent-foreground"
-                                : "bg-primary text-primary-foreground"
+                                justAdded
+                                ? "border-accent bg-accent text-accent-foreground"
+                                : "group-hover:border-primary group-hover:text-primary"
                             }`}
                             onClick={() => handleAdd(item)}
-                          >
+                            >
                             <Plus className="h-4 w-4" />
-                          </Button>
+                            </Button>
+                        )}
                         </div>
-                      ) : (
-                        <Button
-                          size="icon"
-                          variant="outline"
-                          className={`h-9 w-9 rounded-xl transition-all ${
-                            justAdded
-                              ? "border-accent bg-accent text-accent-foreground"
-                              : "group-hover:border-primary group-hover:text-primary"
-                          }`}
-                          onClick={() => handleAdd(item)}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      )}
                     </div>
-                  </div>
-                )
-              })}
-          </div>
-        </section>
-      ))}
+                    )
+                })}
+            </div>
+            </section>
+        ))
+      )}
     </div>
   )
 }
