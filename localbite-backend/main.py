@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from sqlalchemy.exc import OperationalError
 from app.database import engine, Base
-from app.models import Restaurant
+from app.models import Restaurant, User, DeliveryAgent, Payment
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
