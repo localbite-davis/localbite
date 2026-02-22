@@ -8,9 +8,11 @@ class DeliveryAgentBase(BaseModel):
     full_name: str
     email: Optional[EmailStr] = None
     phone_number: str
-    agent_type: AgentType = AgentType.NORMAL
+    agent_type: AgentType = AgentType.THIRD_PARTY
     university_name: Optional[str] = None
     student_id: Optional[str] = None
+    kerberos_id: Optional[str] = None
+    background_check_status: Optional[str] = None
     vehicle_type: VehicleType
     is_active: bool = True
     is_verified: bool = False

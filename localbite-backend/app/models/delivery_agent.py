@@ -6,7 +6,7 @@ from app.database import Base
 
 class AgentType(str, PyEnum):
     STUDENT = "student"
-    NORMAL = "normal"
+    THIRD_PARTY = "third_party"
 
 
 class VehicleType(str, PyEnum):
@@ -28,7 +28,7 @@ class DeliveryAgent(Base):
     agent_type = Column(
         Enum(AgentType, name="agent_type_enum"),
         nullable=False,
-        default=AgentType.NORMAL,
+        default=AgentType.THIRD_PARTY,
     )
     university_name = Column(String, nullable=True)
     student_id = Column(String, nullable=True)
@@ -39,6 +39,12 @@ class DeliveryAgent(Base):
     )
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
+
+    # Simulated Kerberos id for student verification (nullable for third-party agents)
+    kerberos_id = Column(String, nullable=True)
+
+    # Background check status for third-party agents (e.g., pending, passed, failed)
+    background_check_status = Column(String, nullable=True)
 
     rating = Column(Float, default=5.0)
     total_deliveries = Column(Integer, default=0)
