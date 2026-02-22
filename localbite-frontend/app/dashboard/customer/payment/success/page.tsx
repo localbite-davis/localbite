@@ -7,35 +7,98 @@ import { startOrderDispatch } from "@/lib/api/dispatch"
 import { CheckCircle2, Loader2, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
-const API_URL = "http://localhost:8000/api/v1"
-
 export default function PaymentSuccessPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { isAuthenticated, user, isAuthReady } = useAuth()
+  const { isAuthenticated, user, isAuthLoading } = useAuth()
   const [status, setStatus] = useState<"loading" | "success" | "error">(
     "loading"
   )
   const [error, setError] = useState<string | null>(null)
   const dispatchStartedRef = useRef(false)
+  const hasRedirectedRef = useRef(false)
+  const PROCESSING_TIMEOUT_MS = 5000
 
-  const sessionId = searchParams.get("session_id")
   const orderIdFromQuery = searchParams.get("order_id") || searchParams.get("orderId")
 
-  useEffect(() => {
-    // Wait until auth initialization completes
-    if (!isAuthReady) return
+  const redirectToOrders = () => {
+    if (hasRedirectedRef.current) return
+    hasRedirectedRef.current = true
+    setStatus("success")
+    router.push("/dashboard/customer/orders")
+  }
 
-    // If not authenticated after auth is ready => send to login
-    if (!isAuthenticated) {
-      router.replace("/login")
-      return
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      if (!hasRedirectedRef.current) {
+        console.warn(
+          `Payment success processing timed out after ${PROCESSING_TIMEOUT_MS}ms; assuming success`
+        )
+        redirectToOrders()
+      }
+    }, PROCESSING_TIMEOUT_MS)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [router])
+
+  useEffect(() => {
+    const run = async () => {
+      if (isAuthLoading) return
+
+      if (!isAuthenticated) {
+        router.replace("/login")
+        return
+      }
+
+      if (dispatchStartedRef.current) {
+        redirectToOrders()
+        return
+      }
+      dispatchStartedRef.current = true
+
+      try {
+        const rawContext =
+          typeof window !== "undefined"
+            ? window.sessionStorage.getItem("pending_dispatch_context")
+            : null
+        const parsed = rawContext
+          ? (JSON.parse(rawContext) as {
+              orderId?: string
+              deliveryAddress?: string
+            })
+          : undefined
+
+        const parsedOrderId = Number(parsed?.orderId || orderIdFromQuery)
+        if (Number.isFinite(parsedOrderId) && parsedOrderId > 0) {
+          await Promise.race([
+            startOrderDispatch(parsedOrderId, {
+              delivery_address:
+                parsed?.deliveryAddress || "Segundo Dining Commons, Davis, CA",
+              phase1_wait_seconds_min: 15,
+              phase1_wait_seconds_max: 15,
+              phase2_wait_seconds: 15,
+              poll_interval_seconds: 5,
+            }),
+            new Promise((resolve) =>
+              window.setTimeout(resolve, PROCESSING_TIMEOUT_MS)
+            ),
+          ])
+        } else {
+          console.warn("No order_id found on payment success callback; skipping dispatch start")
+        }
+      } catch (err) {
+        // Fail open for demo flow: treat payment as successful and continue.
+        console.error("Dispatch start failed/timed out after payment success:", err)
+      } finally {
+        if (typeof window !== "undefined") {
+          window.sessionStorage.removeItem("pending_dispatch_context")
+        }
+        redirectToOrders()
+      }
     }
 
-    // Authenticated: show success then navigate to cart
-    setStatus("success")
-    router.push("/dashboard/customer/cart")
-  }, [isAuthReady, isAuthenticated, user, router])
+    run()
+  }, [isAuthLoading, isAuthenticated, user, router, orderIdFromQuery])
 
   if (status === "loading") {
     return (
