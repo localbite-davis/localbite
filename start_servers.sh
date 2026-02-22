@@ -11,6 +11,6 @@ osascript -e "tell application \"Terminal\" to do script \"cd '$WORKSPACE_DIR/lo
 
 # Start Frontend in a new Terminal window
 echo "Starting React Frontend..."
-osascript -e "tell application \"Terminal\" to do script \"cd '$WORKSPACE_DIR/localbite-frontend' && npm start\""
+osascript -e "tell application \"Terminal\" to do script \"cd '$WORKSPACE_DIR/localbite-frontend' && npm run dev\""
 
 echo "Servers have been launched in separate Terminal windows."
