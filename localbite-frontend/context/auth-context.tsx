@@ -6,19 +6,18 @@ import { useRouter } from "next/navigation"
 export type UserRole = "customer" | "agent" | "restaurant"
 
 interface User {
-  id?: string | number
   name: string
   email: string
   role: UserRole
   avatar?: string
-  token?: string
 }
 
 interface AuthContextType {
+  
   user: User | null
   isAuthenticated: boolean
   login: (email: string, password: string, role: UserRole) => void
-  signup: (name: string, email: string, password: string, role: UserRole) => void
+  signup: (name: string, email: string, password: string, role: UserRole, isStudent?: boolean) => void
   logout: () => void
 }
 
@@ -80,15 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
            throw new Error(errorData.detail || "Login failed");
         }
 
-        const data = await response.json();
-        
-        const userData: User = { 
-            id: data.user_id,
-            name: email.split("@")[0], 
-            email: data.email || email, 
-            role,
-            token: data.access_token 
-        };
+        const userData: User = { name: email.split("@")[0], email, role };
         setUser(userData);
         router.push(`/dashboard/${role}`);
       } catch (error) {
@@ -100,7 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const signup = useCallback(
-    async (name: string, email: string, password: string, role: UserRole) => {
+    async (name: string, email: string, password: string, role: UserRole, isStudent?: boolean) => {
       try {
         let endpoint = `/register/user`;
         let body: any = {};
@@ -127,19 +118,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 state: "CA",
                 commission_rate: 0.10
             };
-        } else if (role === "agent") {
-            endpoint = `/register/delivery-agent`;
-            body = {
-                full_name: name,
-                email,
-                password,
-                phone_number: "000-000-0000",
-                vehicle_type: "car",
-                base_payout_per_delivery: 5.0,
-                agent_id: `agent_${Date.now()}`,
-                agent_type: "normal"
-            };
-        }
+    } else if (role === "agent") {
+      endpoint = `/register/delivery-agent`;
+      if (isStudent) {
+        // Student agent signup: include simulated UC Davis fields
+        // Generate a mostly-unique phone placeholder to avoid duplicate unique-key errors
+        const uniquePhone = `000-${String(Date.now()).slice(-9)}`;
+
+        body = {
+          full_name: name,
+          email,
+          password,
+          phone_number: uniquePhone,
+          vehicle_type: "car",
+          base_payout_per_delivery: 5.0,
+          agent_id: `agent_${Date.now()}`,
+                  // send lowercase enum values to match backend expectations
+                  agent_type: "student",
+          university_name: "UC Davis",
+          student_id: `ucd_${Date.now()}`,
+          kerberos_id: "mock_kerberos",
+        };
+      } else {
+        // Regular third-party agent
+        const uniquePhone = `000-${String(Date.now()).slice(-9)}`;
+
+        body = {
+          full_name: name,
+          email,
+          password,
+          phone_number: uniquePhone,
+          vehicle_type: "car",
+          base_payout_per_delivery: 5.0,
+          agent_id: `agent_${Date.now()}`,
+                  // align with backend AgentType enum
+                  agent_type: "third_party",
+        };
+      }
+    }
 
         const response = await fetch(`${API_URL}${endpoint}`, {
             method: "POST",
@@ -147,11 +163,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             body: JSON.stringify(body),
         });
 
-        if (!response.ok) {
-            const error = await response.json();
-            console.error("Signup failed details:", error);
-            throw new Error(error.detail || "Signup failed");
-        }
+    if (!response.ok) {
+      // Try to parse JSON error body; fall back to text if not JSON.
+      const text = await response.text();
+      let parsed: any = null;
+      try {
+        parsed = JSON.parse(text);
+      } catch (e) {
+        // Not JSON
+      }
+
+      if (parsed) {
+        console.error("Signup failed details:", parsed);
+        throw new Error(parsed.detail || JSON.stringify(parsed));
+      } else {
+        console.error("Signup failed body:", text);
+        throw new Error(text || "Signup failed");
+      }
+    }
         
         // Auto-login after signup
         await login(email, password, role);

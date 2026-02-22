@@ -11,6 +11,15 @@ async def lifespan(app: FastAPI):
     try:
         # Create tables on startup
         Base.metadata.create_all(bind=engine)
+        # Ensure any new nullable columns exist (useful during development/hackathons
+        # when the DB schema may lag behind model changes). This is idempotent.
+        from app.database import ensure_delivery_agent_columns
+
+        try:
+            ensure_delivery_agent_columns()
+        except Exception as e:
+            # Don't fail startup for this helper, just log the error.
+            print(f"Warning: ensure_delivery_agent_columns failed: {e}")
         print("✅ Database connection established and tables created successfully.")
     except OperationalError as e:
         print(f"❌ Database connection failed: {e}")
