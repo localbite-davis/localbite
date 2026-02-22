@@ -57,7 +57,7 @@ async def get_agent_active_orders(agent_id: str, db: Session = Depends(get_db)):
     if not agent:
         raise HTTPException(status_code=404, detail="Delivery agent not found")
 
-    active_statuses = {"assigned", "on_the_way"}
+    active_statuses = {"assigned", "ready", "on_the_way"}
     orders = (
         db.query(Order)
         .filter(Order.assigned_partner_id == agent_id)

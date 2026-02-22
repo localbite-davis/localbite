@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useAuth } from "@/context/auth-context"
 import { useTheme } from "next-themes"
-import { agentStats } from "@/lib/mock-data"
 import {
   getAvailableDispatchRequestsForAgent,
 } from "@/lib/api/dispatch"
@@ -14,9 +13,11 @@ import {
 } from "@/lib/api/delivery-bids"
 import {
   fulfillAgentOrder,
+  getDeliveryAgentById,
   getAgentActiveOrders,
   type AgentActiveOrder,
 } from "@/lib/api/delivery-agents"
+import { listOrders } from "@/lib/api/orders"
 import {
   Bike,
   Camera,
@@ -97,8 +98,20 @@ type AgentDeliveryCard = {
 }
 
 type AgentDashboardSummary = {
-  totalEarnings: number
+  todayEarnings: number
+  weeklyEarnings: number
+  lifetimeEarnings: number
   totalDeliveries: number
+  rating: number
+  completionRate: number
+  activeHoursToday: number
+  avgPayoutPerDelivery: number
+  weeklyTrendPercent: number
+  recentEarnings: Array<{
+    day: string
+    deliveries: number
+    amount: number
+  }>
 }
 
 type ProofState = {
@@ -124,8 +137,16 @@ export default function AgentDashboard() {
   const [fulfillErrors, setFulfillErrors] = useState<Record<number, string>>({})
   const [fulfillingOrderIds, setFulfillingOrderIds] = useState<number[]>([])
   const [dashboardSummary, setDashboardSummary] = useState<AgentDashboardSummary>({
-    totalEarnings: 0,
+    todayEarnings: 0,
+    weeklyEarnings: 0,
+    lifetimeEarnings: 0,
     totalDeliveries: 0,
+    rating: 0,
+    completionRate: 100,
+    activeHoursToday: 0,
+    avgPayoutPerDelivery: 0,
+    weeklyTrendPercent: 0,
+    recentEarnings: [],
   })
   const [activeTab, setActiveTab] = useState<"available" | "active" | "earnings">("available")
 
@@ -210,12 +231,102 @@ export default function AgentDashboard() {
 
         setIsLoadingActiveOrders(true)
         setActiveOrdersError(null)
-        const response = await getAgentActiveOrders(user.id)
+        const [response, agentProfile, allOrders] = await Promise.all([
+          getAgentActiveOrders(user.id),
+          getDeliveryAgentById(user.id),
+          listOrders(0, 500),
+        ])
+
+        const agentOrders = allOrders.filter((order) => order.assigned_partner_id === user.id)
+        const deliveredOrders = agentOrders.filter((order) => order.order_status === "delivered")
+
+        const now = new Date()
+        const startOfToday = new Date(now)
+        startOfToday.setHours(0, 0, 0, 0)
+
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+        const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000)
+
+        const sumDeliveryFees = (orders: typeof deliveredOrders) =>
+          orders.reduce((sum, order) => sum + Number(order.delivery_fee || 0), 0)
+
+        const todayDelivered = deliveredOrders.filter(
+          (order) => new Date(order.created_at).getTime() >= startOfToday.getTime()
+        )
+        const weeklyDelivered = deliveredOrders.filter((order) => {
+          const ts = new Date(order.created_at).getTime()
+          return ts >= sevenDaysAgo.getTime()
+        })
+        const previousWeekDelivered = deliveredOrders.filter((order) => {
+          const ts = new Date(order.created_at).getTime()
+          return ts >= fourteenDaysAgo.getTime() && ts < sevenDaysAgo.getTime()
+        })
+
+        const todayEarnings = sumDeliveryFees(todayDelivered)
+        const weeklyEarnings = sumDeliveryFees(weeklyDelivered)
+        const previousWeekEarnings = sumDeliveryFees(previousWeekDelivered)
+
+        const totalDeliveries = Number(agentProfile.total_deliveries || 0)
+        const lifetimeEarnings = Number(agentProfile.total_earnings || response.total_earnings || 0)
+        const activeCount = response.active_orders.length
+        const completionBase = totalDeliveries + activeCount
+        const completionRate =
+          completionBase > 0 ? Math.round((totalDeliveries / completionBase) * 100) : 100
+
+        const todaysAgentOrders = agentOrders.filter(
+          (order) => new Date(order.created_at).getTime() >= startOfToday.getTime()
+        )
+        let activeHoursToday = 0
+        if (todaysAgentOrders.length > 0) {
+          const timestamps = todaysAgentOrders.map((order) => new Date(order.created_at).getTime())
+          const minTs = Math.min(...timestamps)
+          const maxTs = Math.max(...timestamps)
+          const spanHours = (maxTs - minTs) / (1000 * 60 * 60)
+          activeHoursToday = Number(Math.max(0.5, spanHours || 0.5).toFixed(1))
+        }
+
+        const recentEarnings = Array.from({ length: 5 }, (_, idx) => {
+          const dayStart = new Date(startOfToday.getTime() - idx * 24 * 60 * 60 * 1000)
+          const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000)
+          const dayOrders = deliveredOrders.filter((order) => {
+            const ts = new Date(order.created_at).getTime()
+            return ts >= dayStart.getTime() && ts < dayEnd.getTime()
+          })
+          let label = dayStart.toLocaleDateString("en-US", { weekday: "long" })
+          if (idx === 0) label = "Today"
+          if (idx === 1) label = "Yesterday"
+          return {
+            day: label,
+            deliveries: dayOrders.length,
+            amount: Number(sumDeliveryFees(dayOrders).toFixed(2)),
+          }
+        })
+
+        let weeklyTrendPercent = 0
+        if (previousWeekEarnings > 0) {
+          weeklyTrendPercent = Math.round(
+            ((weeklyEarnings - previousWeekEarnings) / previousWeekEarnings) * 100
+          )
+        } else if (weeklyEarnings > 0) {
+          weeklyTrendPercent = 100
+        }
+
         if (!cancelled) {
           setActiveOrders(response.active_orders)
           setDashboardSummary({
-            totalEarnings: response.total_earnings,
-            totalDeliveries: response.total_deliveries,
+            todayEarnings: Number(todayEarnings.toFixed(2)),
+            weeklyEarnings: Number(weeklyEarnings.toFixed(2)),
+            lifetimeEarnings: Number(lifetimeEarnings.toFixed(2)),
+            totalDeliveries,
+            rating: Number(agentProfile.rating || 0),
+            completionRate,
+            activeHoursToday,
+            avgPayoutPerDelivery:
+              totalDeliveries > 0
+                ? Number((lifetimeEarnings / totalDeliveries).toFixed(2))
+                : 0,
+            weeklyTrendPercent,
+            recentEarnings,
           })
         }
       } catch (err) {
@@ -317,6 +428,13 @@ export default function AgentDashboard() {
 
   const handleFulfillOrder = async (order: AgentActiveOrder) => {
     if (!user?.id || typeof user.id !== "string") return
+    if (order.order_status !== "ready") {
+      setFulfillErrors((prev) => ({
+        ...prev,
+        [order.order_id]: "Order must be marked ready before fulfillment.",
+      }))
+      return
+    }
     const proof = proofByOrder[order.order_id]
     if (!proof?.localKey) {
       setFulfillErrors((prev) => ({
@@ -338,7 +456,8 @@ export default function AgentDashboard() {
       })
 
       setDashboardSummary({
-        totalEarnings: result.total_earnings,
+        ...dashboardSummary,
+        lifetimeEarnings: result.total_earnings,
         totalDeliveries: result.total_deliveries,
       })
       setActiveOrders((prev) => prev.filter((o) => o.order_id !== order.order_id))
@@ -422,13 +541,13 @@ export default function AgentDashboard() {
           {[
             {
               label: "Today's Earnings",
-              value: `$${dashboardSummary.totalEarnings.toFixed(2)}`,
+              value: `$${dashboardSummary.todayEarnings.toFixed(2)}`,
               icon: DollarSign,
               accent: true,
             },
             {
               label: "Weekly Earnings",
-              value: `$${agentStats.weeklyEarnings.toFixed(2)}`,
+              value: `$${dashboardSummary.weeklyEarnings.toFixed(2)}`,
               icon: TrendingUp,
               accent: false,
             },
@@ -440,7 +559,7 @@ export default function AgentDashboard() {
             },
             {
               label: "Rating",
-              value: agentStats.rating.toFixed(2),
+              value: dashboardSummary.rating.toFixed(2),
               icon: Star,
               accent: true,
             },
@@ -475,12 +594,12 @@ export default function AgentDashboard() {
               Completion Rate
             </p>
             <span className="text-sm font-semibold text-accent-foreground">
-              {agentStats.completionRate}%
+              {dashboardSummary.completionRate}%
             </span>
           </div>
-          <Progress value={agentStats.completionRate} className="mt-3 h-2" />
+          <Progress value={dashboardSummary.completionRate} className="mt-3 h-2" />
           <p className="mt-2 text-xs text-muted-foreground">
-            {agentStats.activeHours}h active today
+            {dashboardSummary.activeHoursToday.toFixed(1)}h active today
           </p>
         </div>
 
@@ -697,6 +816,7 @@ export default function AgentDashboard() {
                 {activeOrders.map((order) => {
                   const proof = proofByOrder[order.order_id]
                   const isFulfilling = fulfillingOrderIds.includes(order.order_id)
+                  const canFulfill = order.order_status === "ready"
                   return (
                     <div
                       key={order.order_id}
@@ -728,45 +848,54 @@ export default function AgentDashboard() {
                               ${order.delivery_fee.toFixed(2)}
                             </span>
                           </div>
+                          {!canFulfill && (
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              Fulfill option unlocks when the restaurant marks the order ready.
+                            </p>
+                          )}
                         </div>
 
                         <div className="w-full sm:w-72 space-y-2">
-                          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-border px-3 py-2 text-sm text-muted-foreground hover:border-primary hover:text-foreground">
-                            <Camera className="h-4 w-4" />
-                            <Upload className="h-4 w-4" />
-                            {proof?.fileName ? "Replace proof photo" : "Capture/Upload proof photo"}
-                            <input
-                              type="file"
-                              accept="image/*"
-                              capture="environment"
-                              className="hidden"
-                              onChange={(e) =>
-                                handleProofFileChange(
-                                  order.order_id,
-                                  e.target.files?.[0] || null
-                                )
-                              }
-                            />
-                          </label>
-                          {proof?.previewDataUrl && (
-                            <div className="rounded-xl border border-border p-2">
-                              <img
-                                src={proof.previewDataUrl}
-                                alt={`Proof for order ${order.order_id}`}
-                                className="h-24 w-full rounded-lg object-cover"
-                              />
-                              <p className="mt-1 truncate text-xs text-muted-foreground">
-                                {proof.fileName || "proof-photo"}
-                              </p>
-                            </div>
+                          {canFulfill && (
+                            <>
+                              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-border px-3 py-2 text-sm text-muted-foreground hover:border-primary hover:text-foreground">
+                                <Camera className="h-4 w-4" />
+                                <Upload className="h-4 w-4" />
+                                {proof?.fileName ? "Replace proof photo" : "Capture/Upload proof photo"}
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  capture="environment"
+                                  className="hidden"
+                                  onChange={(e) =>
+                                    handleProofFileChange(
+                                      order.order_id,
+                                      e.target.files?.[0] || null
+                                    )
+                                  }
+                                />
+                              </label>
+                              {proof?.previewDataUrl && (
+                                <div className="rounded-xl border border-border p-2">
+                                  <img
+                                    src={proof.previewDataUrl}
+                                    alt={`Proof for order ${order.order_id}`}
+                                    className="h-24 w-full rounded-lg object-cover"
+                                  />
+                                  <p className="mt-1 truncate text-xs text-muted-foreground">
+                                    {proof.fileName || "proof-photo"}
+                                  </p>
+                                </div>
+                              )}
+                              <Button
+                                className="w-full rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
+                                onClick={() => handleFulfillOrder(order)}
+                                disabled={isFulfilling}
+                              >
+                                {isFulfilling ? "Fulfilling..." : `Fulfill & Get Paid $${order.delivery_fee.toFixed(2)}`}
+                              </Button>
+                            </>
                           )}
-                          <Button
-                            className="w-full rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
-                            onClick={() => handleFulfillOrder(order)}
-                            disabled={isFulfilling}
-                          >
-                            {isFulfilling ? "Fulfilling..." : `Fulfill & Get Paid $${order.delivery_fee.toFixed(2)}`}
-                          </Button>
                           {fulfillErrors[order.order_id] && (
                             <p className="text-xs text-destructive">
                               {fulfillErrors[order.order_id]}
@@ -789,11 +918,18 @@ export default function AgentDashboard() {
               <div className="rounded-2xl border border-border bg-card p-6">
                 <p className="text-sm text-muted-foreground">This Week</p>
                 <p className="mt-1 text-3xl font-bold text-card-foreground">
-                  ${agentStats.weeklyEarnings.toFixed(2)}
+                  ${dashboardSummary.weeklyEarnings.toFixed(2)}
                 </p>
-                <div className="mt-3 flex items-center gap-1 text-sm text-accent-foreground">
+                <div
+                  className={`mt-3 flex items-center gap-1 text-sm ${
+                    dashboardSummary.weeklyTrendPercent >= 0
+                      ? "text-accent-foreground"
+                      : "text-destructive"
+                  }`}
+                >
                   <TrendingUp className="h-4 w-4" />
-                  +12% from last week
+                  {dashboardSummary.weeklyTrendPercent >= 0 ? "+" : ""}
+                  {dashboardSummary.weeklyTrendPercent}% from last week
                 </div>
               </div>
               <div className="rounded-2xl border border-border bg-card p-6">
@@ -803,7 +939,7 @@ export default function AgentDashboard() {
                 </p>
                 <div className="mt-3 flex items-center gap-1 text-sm text-muted-foreground">
                   <Zap className="h-4 w-4" />
-                  Avg $4.50/delivery
+                  Avg ${dashboardSummary.avgPayoutPerDelivery.toFixed(2)}/delivery
                 </div>
               </div>
             </div>
@@ -814,13 +950,7 @@ export default function AgentDashboard() {
                 Recent Earnings
               </h3>
               <div className="space-y-3">
-                {[
-                  { day: "Today", deliveries: dashboardSummary.totalDeliveries, amount: dashboardSummary.totalEarnings },
-                  { day: "Yesterday", deliveries: 6, amount: 55.75 },
-                  { day: "Monday", deliveries: 5, amount: 48.00 },
-                  { day: "Sunday", deliveries: 7, amount: 63.25 },
-                  { day: "Saturday", deliveries: 8, amount: 75.50 },
-                ].map((row) => (
+                {dashboardSummary.recentEarnings.map((row) => (
                   <div
                     key={row.day}
                     className="flex items-center justify-between rounded-xl bg-secondary p-3"
@@ -838,6 +968,11 @@ export default function AgentDashboard() {
                     </p>
                   </div>
                 ))}
+                {dashboardSummary.recentEarnings.length === 0 && (
+                  <div className="rounded-xl bg-secondary p-3 text-sm text-muted-foreground">
+                    No earnings yet
+                  </div>
+                )}
               </div>
             </div>
           </div>

@@ -263,15 +263,9 @@ export default function CartPage() {
               <span>Subtotal</span>
               <span className="text-card-foreground">${total.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between text-muted-foreground">
-              <span>Delivery fee</span>
-              <span className="text-card-foreground">
-                ${deliveryFee.toFixed(2)}
-              </span>
-            </div>
             <div className="flex items-start justify-between gap-3 text-muted-foreground">
               <div className="flex items-center gap-1.5">
-                <span>Max delivery fee you may pay</span>
+                <span>Delivery fee cap (max)</span>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
@@ -305,7 +299,7 @@ export default function CartPage() {
             </div>
             {fareQuote && (
               <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Max possible total (if cap is used)</span>
+                <span>Maximum total you could pay</span>
                 <span className="text-card-foreground">
                   ${maxPossibleTotal.toFixed(2)}
                 </span>
@@ -313,8 +307,19 @@ export default function CartPage() {
             )}
             <Separator />
             <div className="flex justify-between text-base font-semibold text-card-foreground">
-              <span>Total</span>
+              <span>Estimated total today</span>
               <span>${grandTotal.toFixed(2)}</span>
+            </div>
+          </div>
+          <div className="mt-4 rounded-xl border border-border bg-secondary/60 p-3">
+            <div className="flex items-start gap-2">
+              <div className="mt-0.5 rounded-md bg-background p-1">
+                <UtensilsCrossed className="h-3.5 w-3.5 text-muted-foreground" />
+              </div>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Thank you for ordering local. Using this platform helps neighborhood restaurants
+                retain more revenue while still reaching campus customers.
+              </p>
             </div>
           </div>
           {fareQuoteError && (

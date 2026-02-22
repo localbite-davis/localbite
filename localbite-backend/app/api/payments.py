@@ -13,6 +13,8 @@ router = APIRouter(prefix="/payments", tags=["payments"])
 
 # Mock Stripe sessions store (in production, use a proper database)
 MOCK_STRIPE_SESSIONS = {}
+BACKEND_PUBLIC_BASE_URL = os.getenv("BACKEND_PUBLIC_BASE_URL", "http://172.26.56.184:8000")
+FRONTEND_PUBLIC_BASE_URL = os.getenv("FRONTEND_PUBLIC_BASE_URL", "http://172.26.56.184:3000")
 
 class StripeCheckoutRequest(BaseModel):
     payment_id: str  # Accept as string, will be stored as reference
@@ -44,7 +46,7 @@ def create_stripe_checkout(
         return {
             "session_id": session_id,
             "charge_id": f"ch_test_{uuid4().hex[:20]}",
-            "url": f"http://localhost:8000/api/v1/payments/stripe/mock-checkout?session_id={session_id}"
+            "url": f"{BACKEND_PUBLIC_BASE_URL}/api/v1/payments/stripe/mock-checkout?session_id={session_id}"
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -143,10 +145,10 @@ def mock_stripe_checkout(session_id: str):
             <div class="amount">${amount / 100:.2f}</div>
             <p>Test Card: 4242 4242 4242 4242</p>
             <div class="buttons">
-                <form action="http://localhost:3000/dashboard/customer/payment/success?session_id={session_id}&order_id={order_id}" method="get" style="flex: 1;">
+                <form action="{FRONTEND_PUBLIC_BASE_URL}/dashboard/customer/payment/success?session_id={session_id}&order_id={order_id}" method="get" style="flex: 1;">
                     <button type="submit" class="btn-success" style="width: 100%;">✓ Pay Successfully</button>
                 </form>
-                <form action="http://localhost:3000/dashboard/customer/payment/cancel?session_id={session_id}&order_id={order_id}" method="get" style="flex: 1;">
+                <form action="{FRONTEND_PUBLIC_BASE_URL}/dashboard/customer/payment/cancel?session_id={session_id}&order_id={order_id}" method="get" style="flex: 1;">
                     <button type="submit" class="btn-cancel" style="width: 100%;">✕ Cancel Payment</button>
                 </form>
             </div>

@@ -8,7 +8,7 @@ import { Star, Clock, MapPin, ArrowLeft, Plus, Minus, ShoppingCart } from "lucid
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 
-const API_URL = "http://localhost:8000/api/v1"
+const API_URL = "http://172.26.56.184:8000/api/v1"
 
 interface Restaurant {
   id: number

@@ -5,10 +5,11 @@ import Link from "next/link"
 import { useAuth } from "@/context/auth-context"
 import { useTheme } from "next-themes"
 import {
-  restaurantOrders,
   restaurantMenuItems,
   restaurantStats,
 } from "@/lib/mock-data"
+import { listOrders } from "@/lib/api/orders"
+import { getMenuItem } from "@/lib/api/menu"
 import {
   Store,
   DollarSign,
@@ -56,6 +57,28 @@ import { Textarea } from "@/components/ui/textarea"
 
 type OrderStatus = "new" | "preparing" | "ready"
 
+type BackendRestaurantOrder = {
+  order_id: number
+  user_id: number
+  restaurant_id: number
+  order_items: Array<{ item_id: number; quantity: number }>
+  base_fare: number
+  delivery_fee: number
+  commission_amount: number
+  order_status: string
+  created_at: string
+}
+
+type RestaurantDashboardOrder = {
+  id: string
+  backendOrderId?: number
+  customerName: string
+  items: Array<{ name: string; quantity: number }>
+  total: number
+  status: OrderStatus
+  time: string
+}
+
 const statusConfig: Record<
   OrderStatus,
   { label: string; icon: typeof AlertCircle; color: string; nextStatus: OrderStatus | null; nextLabel: string }
@@ -87,9 +110,10 @@ export default function RestaurantDashboard() {
   const { user, logout } = useAuth()
   const { theme, setTheme } = useTheme()
   const [activeTab, setActiveTab] = useState<"orders" | "menu" | "analytics" | "settings">("orders")
-  const [orders, setOrders] = useState(restaurantOrders)
+  const [orders, setOrders] = useState<RestaurantDashboardOrder[]>([])
   const [menuItems, setMenuItems] = useState(restaurantMenuItems)
   const [orderFilter, setOrderFilter] = useState<"all" | OrderStatus>("all")
+  const [updatingOrderIds, setUpdatingOrderIds] = useState<Record<number, boolean>>({})
 
   // Menu Management State
   const [isAddItemOpen, setIsAddItemOpen] = useState(false)
@@ -101,12 +125,115 @@ export default function RestaurantDashboard() {
     description: "",
   })
 
+  const mapBackendOrderStatus = (status: string): OrderStatus => {
+    if (status === "preparing") return "preparing"
+    if (["ready", "bidding", "assigned", "on_the_way", "delivered"].includes(status)) {
+      return "ready"
+    }
+    return "new"
+  }
+
+  const formatElapsed = (isoDate: string) => {
+    const diffMs = Date.now() - new Date(isoDate).getTime()
+    const diffMin = Math.max(0, Math.floor(diffMs / 60000))
+    if (diffMin < 1) return "Just now"
+    if (diffMin < 60) return `${diffMin} min ago`
+    const diffHr = Math.floor(diffMin / 60)
+    return `${diffHr} hr ago`
+  }
+
+  const fetchRestaurantOrders = async () => {
+    if (!user?.id) return
+
+    const restaurantId = typeof user.id === "string" ? parseInt(user.id, 10) : user.id
+    const data = (await listOrders(0, 200)) as BackendRestaurantOrder[]
+    const restaurantOrders = data.filter((order) => order.restaurant_id === restaurantId)
+
+    const uniqueItemIds = Array.from(
+      new Set(
+        restaurantOrders.flatMap((order) => order.order_items.map((item) => item.item_id))
+      )
+    )
+
+    const menuItemCache: Record<number, { name: string; price: number }> = {}
+    await Promise.all(
+      uniqueItemIds.map(async (itemId) => {
+        try {
+          const menuItem = await getMenuItem(itemId)
+          menuItemCache[itemId] = {
+            name: menuItem.item_name,
+            price: menuItem.price,
+          }
+        } catch (err) {
+          console.error(`Failed to fetch menu item ${itemId}`, err)
+          menuItemCache[itemId] = {
+            name: `Item ${itemId}`,
+            price: 0,
+          }
+        }
+      })
+    )
+
+    const mapped = data
+      .filter((order) => order.restaurant_id === restaurantId)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .map((order) => {
+        const items = order.order_items.map((item) => ({
+          name: menuItemCache[item.item_id]?.name || `Item ${item.item_id}`,
+          quantity: item.quantity,
+        }))
+        const itemSubtotal = order.order_items.reduce((sum, item) => {
+          const unitPrice = menuItemCache[item.item_id]?.price || 0
+          return sum + unitPrice * item.quantity
+        }, 0)
+        const subtotal = itemSubtotal > 0 ? itemSubtotal : (order.base_fare || 0)
+        const total =
+          subtotal + (order.delivery_fee || 0) + (order.commission_amount || 0)
+
+        return {
+          id: `RO-${order.order_id}`,
+          backendOrderId: order.order_id,
+          customerName: `Customer #${order.user_id}`,
+          items,
+          total,
+          status: mapBackendOrderStatus(order.order_status),
+          time: formatElapsed(order.created_at),
+        }
+      })
+
+    setOrders(mapped)
+  }
+
+  useEffect(() => {
+    if (activeTab !== "orders" || !user?.id) return
+
+    let cancelled = false
+
+    const load = async () => {
+      try {
+        await fetchRestaurantOrders()
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Error fetching restaurant orders:", error)
+        }
+      }
+    }
+
+    load()
+    const interval = setInterval(load, 5000)
+
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [activeTab, user?.id, orderFilter])
+
   // Fetch Menu Items
   useEffect(() => {
     if (activeTab === "menu" && user?.id) {
       const fetchMenuItems = async () => {
         try {
-          const response = await fetch(`http://localhost:8000/api/v1/menu/restaurant/${user.id}`)
+          const response = await fetch(`http://172.26.56.184:8000/api/v1/menu/restaurant/${user.id}`)
           if (response.ok) {
             const data = await response.json()
             // Map backend fields to frontend expected format
@@ -146,7 +273,7 @@ export default function RestaurantDashboard() {
         availability: true
       };
 
-      const response = await fetch("http://localhost:8000/api/v1/menu/", {
+      const response = await fetch("http://172.26.56.184:8000/api/v1/menu/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -182,18 +309,49 @@ export default function RestaurantDashboard() {
     }
   };
 
-  const updateOrderStatus = (orderId: string) => {
-    setOrders((prev) =>
-      prev.map((order) => {
-        if (order.id === orderId) {
-          const config = statusConfig[order.status as OrderStatus]
-          if (config?.nextStatus) {
-            return { ...order, status: config.nextStatus }
-          }
+  const updateOrderStatus = async (order: RestaurantDashboardOrder) => {
+    const config = statusConfig[order.status]
+    if (!config?.nextStatus) return
+
+    if (!order.backendOrderId) {
+      // Fallback for initial mock state before backend fetch completes.
+      setOrders((prev) =>
+        prev.map((o) => (o.id === order.id ? { ...o, status: config.nextStatus! } : o))
+      )
+      return
+    }
+
+    const backendStatus = config.nextStatus === "ready" ? "ready" : config.nextStatus
+
+    setUpdatingOrderIds((prev) => ({ ...prev, [order.backendOrderId!]: true }))
+    try {
+      const response = await fetch(
+        `http://172.26.56.184:8000/api/v1/orders/${order.backendOrderId}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({ order_status: backendStatus }),
         }
-        return order
+      )
+
+      if (!response.ok) {
+        throw new Error("Failed to update order status")
+      }
+
+      await fetchRestaurantOrders()
+    } catch (error) {
+      console.error("Error updating order status:", error)
+      alert("Failed to update order status")
+    } finally {
+      setUpdatingOrderIds((prev) => {
+        const next = { ...prev }
+        delete next[order.backendOrderId!]
+        return next
       })
-    )
+    }
   }
 
   const toggleMenuAvailability = (itemId: string) => {
@@ -412,9 +570,12 @@ export default function RestaurantDashboard() {
                             <Button
                               size="sm"
                               className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
-                              onClick={() => updateOrderStatus(order.id)}
+                              onClick={() => updateOrderStatus(order)}
+                              disabled={Boolean(order.backendOrderId && updatingOrderIds[order.backendOrderId])}
                             >
-                              {config.nextLabel}
+                              {order.backendOrderId && updatingOrderIds[order.backendOrderId]
+                                ? "Updating..."
+                                : config.nextLabel}
                             </Button>
                           )}
                         </div>

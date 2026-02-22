@@ -5,6 +5,7 @@ import { useAuth } from "@/context/auth-context"
 import { getUserOrders, Order } from "@/lib/api/orders"
 import { getMenuItem } from "@/lib/api/menu"
 import { getDispatchStatus, type DispatchStatusResponse } from "@/lib/api/dispatch"
+import { getDeliveryAgentById } from "@/lib/api/delivery-agents"
 import {
   Clock,
   CheckCircle2,
@@ -54,11 +55,31 @@ function mapBackendStatus(backendStatus: string): string {
   return statusMap[backendStatus] || "placed"
 }
 
+function getAcceptedByAgentId(note?: string | null): string | null {
+  if (!note) return null
+  const match = note.match(/accepted_by=([A-Za-z0-9_-]+)/)
+  return match?.[1] || null
+}
+
+function formatDispatchNote(
+  note: string | null | undefined,
+  agentNameCache: Record<string, string>
+): string {
+  if (!note) return "Looking for a delivery partner"
+
+  const acceptedAgentId = getAcceptedByAgentId(note)
+  if (!acceptedAgentId) return note
+
+  const agentName = agentNameCache[acceptedAgentId]
+  return agentName ? `${agentName}'s delivering to you` : "Driver accepted your order"
+}
+
 export default function OrdersPage() {
   const { user } = useAuth()
   const [orders, setOrders] = useState<Order[]>([])
   const [menuItemCache, setMenuItemCache] = useState<Record<number, string>>({})
   const [dispatchStatusMap, setDispatchStatusMap] = useState<Record<number, DispatchStatusResponse>>({})
+  const [agentNameCache, setAgentNameCache] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -113,6 +134,51 @@ export default function OrdersPage() {
   }, [user?.id])
 
   useEffect(() => {
+    const orderAssignedAgentIds = orders
+      .map((order) => order.assigned_partner_id)
+      .filter((agentId): agentId is string => Boolean(agentId))
+
+    const dispatchAcceptedAgentIds = Object.values(dispatchStatusMap)
+      .map((dispatch) => getAcceptedByAgentId(dispatch.note))
+      .filter((agentId): agentId is string => Boolean(agentId))
+
+    const assignedAgentIds = Array.from(
+      new Set([...orderAssignedAgentIds, ...dispatchAcceptedAgentIds])
+    ).filter((agentId) => !agentNameCache[agentId])
+
+    if (assignedAgentIds.length === 0) {
+      return
+    }
+
+    let cancelled = false
+
+    const loadAgentNames = async () => {
+      const resolvedNames: Record<string, string> = {}
+
+      await Promise.all(
+        assignedAgentIds.map(async (agentId) => {
+          try {
+            const agent = await getDeliveryAgentById(agentId)
+            resolvedNames[agentId] = agent.full_name
+          } catch (err) {
+            console.error(`Failed to fetch agent ${agentId}`, err)
+          }
+        })
+      )
+
+      if (!cancelled && Object.keys(resolvedNames).length > 0) {
+        setAgentNameCache((prev) => ({ ...prev, ...resolvedNames }))
+      }
+    }
+
+    loadAgentNames()
+
+    return () => {
+      cancelled = true
+    }
+  }, [orders, dispatchStatusMap, agentNameCache])
+
+  useEffect(() => {
     if (orders.length === 0) {
       setDispatchStatusMap({})
       return
@@ -156,6 +222,9 @@ export default function OrdersPage() {
     backendStatus: string,
     dispatch?: DispatchStatusResponse
   ): string {
+    if (backendStatus === "delivered") return "delivered"
+    if (backendStatus === "cancelled") return "placed"
+
     if (!dispatch) return mapBackendStatus(backendStatus)
 
     if (dispatch.status === "needs_fee_increase") return "needs_fee_increase"
@@ -174,21 +243,27 @@ export default function OrdersPage() {
   }
 
   // Convert backend orders to frontend format
-  const formattedOrders = orders.map((order) => ({
-    orderId: order.order_id,
-    id: `ORD-${order.order_id}`,
-    restaurant: order.restaurant?.name || `Restaurant ${order.restaurant_id}`,
-    items: order.order_items.map((item) => ({
-      name: menuItemCache[item.item_id] || `Item ${item.item_id}`,
-      quantity: item.quantity,
-    })),
-    total: order.base_fare + order.delivery_fee + order.commission_amount,
-    status: mapDispatchToFrontendStatus(order.order_status, dispatchStatusMap[order.order_id]),
-    date: order.created_at,
-    eta: "15-20 min",
-    driver: null as string | null,
-    driverRating: 4.8,
-  }))
+  const formattedOrders = orders.map((order) => {
+    const dispatchStatus = dispatchStatusMap[order.order_id]
+    const dispatchAssignedAgentId = getAcceptedByAgentId(dispatchStatus?.note)
+    const assignedAgentId = order.assigned_partner_id || dispatchAssignedAgentId || undefined
+
+    return {
+      orderId: order.order_id,
+      id: `ORD-${order.order_id}`,
+      restaurant: order.restaurant?.name || `Restaurant ${order.restaurant_id}`,
+      items: order.order_items.map((item) => ({
+        name: menuItemCache[item.item_id] || `Item ${item.item_id}`,
+        quantity: item.quantity,
+      })),
+      total: order.base_fare + order.delivery_fee + order.commission_amount,
+      status: mapDispatchToFrontendStatus(order.order_status, dispatchStatus),
+      date: order.created_at,
+      eta: "15-20 min",
+      driver: assignedAgentId ? agentNameCache[assignedAgentId] || null : null,
+      driverRating: 4.8,
+    }
+  })
 
   // Sort by date descending (most recent first)
   const sortedOrders = [...formattedOrders].sort((a, b) => 
@@ -320,7 +395,7 @@ export default function OrdersPage() {
                       </span>
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {activeDispatchStatus.note || "Looking for a delivery partner"}
+                      {formatDispatchNote(activeDispatchStatus.note, agentNameCache)}
                     </p>
                     {activeDispatchStatus.status === "needs_fee_increase" && (
                       <div className="mt-3 rounded-lg bg-destructive/10 p-3 text-xs text-destructive">
@@ -338,7 +413,7 @@ export default function OrdersPage() {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-secondary-foreground">
-                        {activeOrder.driver}
+                        {activeOrder.driver}&apos;s delivering to you
                       </p>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Star className="h-3 w-3 fill-accent text-accent" />

@@ -26,7 +26,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null)
 
-const API_URL = "http://localhost:8000/api/v1";
+const API_URL = "http://172.26.56.184:8000/api/v1";
 
 function mapBackendUserTypeToRole(userType?: string): UserRole {
   if (userType === "restaurant") return "restaurant"

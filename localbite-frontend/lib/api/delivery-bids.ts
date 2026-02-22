@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:8000/api/v1"
+const API_URL = "http://172.26.56.184:8000/api/v1"
 
 export type PoolPhase = "student_pool" | "all_agents"
 export type BidStatus = "placed" | "accepted" | "rejected" | "expired" | "withdrawn"
