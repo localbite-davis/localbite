@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 export type UserRole = "customer" | "agent" | "restaurant"
 
 interface User {
+  id?: number
   name: string
   email: string
   role: UserRole
@@ -50,7 +51,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
            throw new Error(errorData.detail || "Login failed");
         }
 
-        const userData: User = { name: email.split("@")[0], email, role };
+        const responseData = await response.json();
+        const userData: User = { 
+          id: responseData.id || 1, // Fallback to 1 for test customer
+          name: email.split("@")[0], 
+          email, 
+          role 
+        };
         setUser(userData);
         router.push(`/dashboard/${role}`);
       } catch (error) {
