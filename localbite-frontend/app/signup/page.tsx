@@ -16,7 +16,7 @@ const roles: {
   icon: typeof UtensilsCrossed
   description: string
 }[] = [
-  { value: "customer", label: "Student", icon: UtensilsCrossed, description: "Order food from Davis restaurants" },
+  { value: "customer", label: "Customer", icon: UtensilsCrossed, description: "Order food from Davis restaurants" },
   { value: "agent", label: "Delivery Agent", icon: Bike, description: "Deliver food and earn money" },
   { value: "restaurant", label: "Restaurant", icon: Store, description: "Manage orders and grow your business" },
 ]
