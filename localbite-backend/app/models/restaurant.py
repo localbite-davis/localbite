@@ -7,6 +7,8 @@ class Restaurant(Base):
     __tablename__ = "restaurants"
 
     id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, index=True, nullable=False)
+    password_hash = Column(String, nullable=False)
     name = Column(String, nullable=False)
     description = Column(String, nullable=True)
     cuisine_type = Column(String, nullable=False)

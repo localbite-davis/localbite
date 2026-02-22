@@ -22,6 +22,7 @@ class DeliveryAgent(Base):
     agent_id = Column(String, primary_key=True, index=True)
     full_name = Column(String, nullable=False)
     email = Column(String, unique=True, nullable=True, index=True)
+    password_hash = Column(String, nullable=False)
     phone_number = Column(String, unique=True, nullable=False)
 
     agent_type = Column(

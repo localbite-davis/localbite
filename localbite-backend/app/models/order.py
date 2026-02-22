@@ -8,7 +8,7 @@ class Order(Base):
     order_id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False)
-    assigned_partner_id = Column(Integer, ForeignKey("delivery_agents.agent_id"), nullable=True)
+    assigned_partner_id = Column(String, ForeignKey("delivery_agents.agent_id"), nullable=True)
     order_items = Column(JSON, nullable=False)  # Store items as JSON
     base_fare = Column(Float, nullable=False)
     delivery_fee = Column(Float, nullable=False)
