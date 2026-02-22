@@ -17,6 +17,7 @@ interface AuthContextType {
   user: User | null
   isAuthLoading: boolean
   isAuthenticated: boolean
+  isAuthReady: boolean
   login: (email: string, password: string, role: UserRole) => void
   signup: (name: string, email: string, password: string, role: UserRole, isStudent?: boolean) => void
   logout: () => void
@@ -35,6 +36,7 @@ function mapBackendUserTypeToRole(userType?: string): UserRole {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
+  const [isAuthReady, setIsAuthReady] = useState(false)
   const [isAuthLoading, setIsAuthLoading] = useState(true)
   const router = useRouter()
 
@@ -65,6 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null)
       } finally {
         setIsAuthLoading(false)
+
       }
     }
 
@@ -247,6 +250,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         isAuthLoading,
         isAuthenticated: !!user,
+        isAuthReady,
         login,
         signup,
         logout,
