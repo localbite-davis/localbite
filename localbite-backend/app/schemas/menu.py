@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 class MenuItemBase(BaseModel):
@@ -11,8 +11,13 @@ class MenuItemBase(BaseModel):
 class MenuItemCreate(MenuItemBase):
     pass  # For POST requests
 
-class MenuItemResponse(MenuItemBase):
+class MenuItemUpdate(BaseModel):
+    item_name: Optional[str] = None
+    price: Optional[float] = None
+    availability: Optional[bool] = None
+    category: Optional[str] = None
+
+class MenuItemOut(MenuItemBase):
     menu_id: int  # Primary key
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)

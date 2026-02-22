@@ -33,6 +33,7 @@ class DeliveryAgentBase(BaseModel):
 
 class DeliveryAgentCreate(DeliveryAgentBase):
     agent_id: str
+    password: str
 
 
 class DeliveryAgentUpdate(BaseModel):

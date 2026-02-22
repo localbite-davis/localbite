@@ -18,7 +18,8 @@ class RestaurantBase(BaseModel):
 
 
 class RestaurantCreate(RestaurantBase):
-    pass
+    email: str # Or EmailStr, need to import if not available
+    password: str
 
 
 class RestaurantUpdate(BaseModel):

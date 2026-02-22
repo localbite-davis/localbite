@@ -3,8 +3,23 @@ from app.models.users import User
 from app.schemas.users import UserCreate, UserUpdate
 
 
+from app.core.security import get_password_hash
+
 def create(db: Session, payload: UserCreate) -> User:
-    db_obj = User(**payload.model_dump())
+    hashed_password = get_password_hash(payload.password)
+    db_obj = User(
+        email=payload.email,
+        phone=payload.phone,
+        password_hash=hashed_password,
+        first_name=payload.first_name,
+        last_name=payload.last_name,
+        role=payload.role,
+        is_email_verified=payload.is_email_verified,
+        is_phone_verified=payload.is_phone_verified,
+        is_active=payload.is_active,
+        loyalty_points=payload.loyalty_points,
+        lifetime_spent=payload.lifetime_spent,
+    )
     db.add(db_obj)
     db.commit()
     db.refresh(db_obj)

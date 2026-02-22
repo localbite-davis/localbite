@@ -3,8 +3,25 @@ from app.models.restaurant import Restaurant
 from app.schemas.restaurant import RestaurantCreate, RestaurantUpdate
 
 
+from app.core.security import get_password_hash
+
 def create(db: Session, payload: RestaurantCreate) -> Restaurant:
-    db_obj = Restaurant(**payload.model_dump())
+    hashed_password = get_password_hash(payload.password)
+    db_obj = Restaurant(
+        name=payload.name,
+        email=payload.email,
+        description=payload.description,
+        cuisine_type=payload.cuisine_type,
+        address=payload.address,
+        city=payload.city,
+        state=payload.state,
+        latitude=payload.latitude,
+        longitude=payload.longitude,
+        commission_rate=payload.commission_rate,
+        is_active=payload.is_active,
+        password_hash=hashed_password
+    )
+    # I should check if Restaurant has email in model.
     db.add(db_obj)
     db.commit()
     db.refresh(db_obj)
