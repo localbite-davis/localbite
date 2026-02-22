@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 from app.models.delivery_agent import AgentType, VehicleType
 
 
@@ -22,6 +22,20 @@ class DeliveryAgentBase(BaseModel):
     current_lng: Optional[float] = None
     base_payout_per_delivery: float = Field(..., ge=0)
     bonus_multiplier: float = Field(default=1.0, ge=0)
+
+    @field_validator("agent_type", mode="before")
+    @classmethod
+    def normalize_agent_type(cls, value):
+        if isinstance(value, str):
+            return value.strip().lower().replace("-", "_").replace(" ", "_")
+        return value
+
+    @field_validator("vehicle_type", mode="before")
+    @classmethod
+    def normalize_vehicle_type(cls, value):
+        if isinstance(value, str):
+            return value.strip().lower().replace("-", "_").replace(" ", "_")
+        return value
 
     @model_validator(mode="after")
     def validate_student_fields(self):
@@ -54,11 +68,49 @@ class DeliveryAgentUpdate(BaseModel):
     current_lng: Optional[float] = None
     base_payout_per_delivery: Optional[float] = Field(default=None, ge=0)
     bonus_multiplier: Optional[float] = Field(default=None, ge=0)
+    total_earnings: Optional[float] = Field(default=None, ge=0)
 
 
 class DeliveryAgentOut(DeliveryAgentBase):
     agent_id: str
+    total_earnings: float = 0.0
     created_at: datetime
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class AgentActiveOrderItem(BaseModel):
+    order_id: int
+    restaurant_id: int
+    restaurant_name: Optional[str] = None
+    delivery_address: Optional[str] = None
+    order_status: str
+    items_count: int = 0
+    delivery_fee: float
+    created_at: datetime
+    assigned_at: Optional[str] = None
+
+
+class AgentActiveOrdersResponse(BaseModel):
+    agent_id: str
+    total_earnings: float
+    total_deliveries: int
+    active_orders: list[AgentActiveOrderItem]
+
+
+class FulfillDeliveryRequest(BaseModel):
+    proof_photo_ref: str = Field(..., min_length=1)
+    proof_photo_filename: Optional[str] = None
+
+
+class FulfillDeliveryResponse(BaseModel):
+    agent_id: str
+    order_id: int
+    order_status: str
+    payout_amount: float
+    payout_status: str
+    total_earnings: float
+    total_deliveries: int
+    delivered_at: datetime
+    proof_photo_ref: str

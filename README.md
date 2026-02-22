@@ -148,41 +148,169 @@ The backend provides a comprehensive REST API. Once running, visit `http://local
    cd localbite-frontend
    ```
 
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+## Running the Application (Backend + Redis, Recommended)
 
-3. **Run the development server:**
-   ```bash
-   npm run dev
-   ```
-   App will start at `http://localhost:3000`.
+Before starting, ensure your Neon connection is configured in:
+- `localbite-backend/.env` (`DATABASE_URL=...`)
+or set the individual DB env vars used by the backend.
 
----
+Start backend + local Redis:
 
-## 🤝 Contribution Guidelines
+```bash
+./deploy_backend.sh
+```
 
-We welcome contributions! To get started:
+This starts:
+- **Redis**: `localhost:6379` (if installed locally and not already running)
+- **Backend**: http://localhost:8000
 
-1. **Fork the repository** on GitHub.
-2. **Clone your fork** locally.
-   ```bash
-   git clone https://github.com/your-username/localbite.git
-   ```
-3. **Create a new branch** for your feature or bugfix.
-   ```bash
-   git checkout -b feature/amazing-new-feature
-   ```
-4. **Make your changes** and commit them with descriptive messages.
-5. **Push to your fork** and submit a **Pull Request**.
+## Running the Frontend (Local)
 
-### Development Tips
-- **Backend Reloading**: Since `uvicorn` runs with `--reload`, changes to Python files will automatically restart the server.
-- **Frontend HMR**: Next.js provides Hot Module Replacement, so UI changes reflect instantly.
-- **Database Schema**: If you modify models in `app/models/`, ensure you handle migration/updates securely (currently using `Base.metadata.create_all(bind=engine)` for auto-creation).
+```bash
+cd localbite-frontend
+npm install
+npm run dev
+```
 
----
+Frontend:
+- **Frontend**: http://localhost:3000
 
-Built with ❤️ by the Localbite Team.
+## Integration Workflow (Dispatch + Bidding)
 
+Run the Postman/Newman integration workflow (local backend):
+
+```bash
+./run_api_tests.sh
+```
+
+Reports are written to:
+- `localbite-backend/postman/reports/`
+
+## Running the Application (Older Local Scripts)
+
+To start both the Backend and Frontend servers in separate terminals, run:
+
+```bash
+./start_servers.sh
+```
+
+This will launch:
+- **Backend**: http://localhost:8000 (with auto-reload)
+- **Frontend**: http://localhost:3000
+
+### Backend + Redis (Dispatch/Bidding Testing, Alternative)
+
+For dispatch timer and bidding workflows (which require Redis), use:
+
+```bash
+cd localbite-backend
+./scripts/start_backend_with_redis.sh
+```
+
+## API Documentation
+
+Once the backend is running, you can access the interactive API docs at:
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
+
+## Base Fare Recommendation API
+
+New endpoint:
+
+- `POST /api/v1/fares/recommendation`
+
+Purpose:
+
+- Calculates `base_fare` (minimum bidding fare for delivery agents)
+- Calculates `max_bid_limit` (`1.5x` of `base_fare`)
+- Returns `eta_estimate_minutes`
+
+Payload supports either:
+
+- `distance_km` from your distance API, or
+- coordinates for both user and restaurant (`latitude`/`longitude`) to compute distance with Haversine.
+
+Example request body:
+
+```json
+{
+  "user_location": {
+    "address": "500 1st St, Davis, CA",
+    "latitude": 38.5449,
+    "longitude": -121.7405
+  },
+  "restaurant_location": {
+    "address": "220 G St, Davis, CA",
+    "latitude": 38.5435,
+    "longitude": -121.7407
+  },
+  "incentive_metrics": {
+    "demand_index": 1.1,
+    "supply_index": 0.9,
+    "weather_severity": 0.1
+  }
+}
+```
+
+## Delivery Agent Bidding API
+
+New endpoint:
+
+- `POST /api/v1/delivery-bids/`
+
+Behavior:
+
+- Validates bid against the order's bidding window:
+  - minimum = `orders.base_fare`
+  - maximum = `1.5 * orders.base_fare`
+- Supports phased dispatch bidding:
+  - `student_pool`: only student delivery agents can bid
+  - `all_agents`: all active agents can bid
+
+Example request body:
+
+```json
+{
+  "order_id": 101,
+  "agent_id": "agent_123",
+  "bid_amount": 6.5,
+  "pool_phase": "student_pool"
+}
+```
+
+Accept a bid (assign order + stop dispatch flow):
+
+- `POST /api/v1/delivery-bids/{bid_id}/accept`
+
+Notes:
+
+- Marks selected bid as `accepted`
+- Rejects competing `placed` bids for the same order
+- Assigns `orders.assigned_partner_id`
+- Updates dispatch state in Redis so phase timers stop
+
+## Dispatch (Phase Timer) API
+
+New endpoints:
+
+- `POST /api/v1/dispatch/orders/{order_id}/start`
+- `GET /api/v1/dispatch/orders/{order_id}/status`
+
+Behavior:
+
+- Starts two-phase dispatch in background
+- Phase 1 (`student_pool`): student-only broadcast, waits configurable timer
+- Phase 2 (`all_agents`): full-pool broadcast, waits configurable timer
+- If still unassigned after Phase 2: status becomes `needs_fee_increase`
+
+Example start request body:
+
+```json
+{
+  "delivery_address": "500 1st St, Davis, CA",
+  "phase1_wait_seconds_min": 180,
+  "phase1_wait_seconds_max": 240,
+  "phase2_wait_seconds": 180,
+  "poll_interval_seconds": 5
+}
+```

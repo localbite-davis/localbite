@@ -1,0 +1,13 @@
+{
+  "name": "localbite-postman-workflows",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Newman-based integration workflows for Localbite backend",
+  "scripts": {
+    "test:workflow": "./run_newman_workflow.sh",
+    "test:workflow:bail": "./run_newman_workflow.sh --bail"
+  },
+  "devDependencies": {
+    "newman": "^6.2.1"
+  }
+}

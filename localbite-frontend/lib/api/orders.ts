@@ -82,3 +82,30 @@ export async function getUserOrders(userId: number): Promise<Order[]> {
     }
     throw new Error("Failed to fetch user orders");  }
 }
+
+export async function listOrders(
+  skip: number = 0,
+  limit: number = 100
+): Promise<Order[]> {
+  try {
+    const response = await fetch(
+      `${API_URL}/orders?skip=${skip}&limit=${limit}`,
+      {
+        credentials: "include",
+        cache: "no-store",
+      }
+    )
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch orders")
+    }
+
+    const data: Order[] = await response.json()
+    return data
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(`Failed to fetch orders: ${error.message}`)
+    }
+    throw new Error("Failed to fetch orders")
+  }
+}

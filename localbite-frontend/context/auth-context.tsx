@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 export type UserRole = "customer" | "agent" | "restaurant"
 
 interface User {
-  id?: number
+  id?: number | string
   name: string
   email: string
   role: UserRole
@@ -14,8 +14,8 @@ interface User {
 }
 
 interface AuthContextType {
-  
   user: User | null
+  isAuthLoading: boolean
   isAuthenticated: boolean
   login: (email: string, password: string, role: UserRole) => void
   signup: (name: string, email: string, password: string, role: UserRole, isStudent?: boolean) => void
@@ -27,8 +27,15 @@ const AuthContext = createContext<AuthContextType | null>(null)
 
 const API_URL = "http://localhost:8000/api/v1";
 
+function mapBackendUserTypeToRole(userType?: string): UserRole {
+  if (userType === "restaurant") return "restaurant"
+  if (userType === "delivery_agent") return "agent"
+  return "customer"
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
+  const [isAuthLoading, setIsAuthLoading] = useState(true)
   const router = useRouter()
 
   // Verify user session on mount
@@ -44,15 +51,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const userData = await response.json()
           const user: User = {
             id: userData.id,
-            name: userData.first_name,
+            name: userData.name || userData.full_name || userData.first_name,
             email: userData.email,
-            role: userData.role || "customer",
+            role: userData.role || mapBackendUserTypeToRole(userData.user_type),
           }
           setUser(user)
+        } else {
+          setUser(null)
         }
       } catch (error) {
         // Session doesn't exist or expired, user stays logged out
         console.log("No active session found")
+        setUser(null)
+      } finally {
+        setIsAuthLoading(false)
       }
     }
 
@@ -81,9 +93,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
            throw new Error(errorData.detail || "Login failed");
         }
 
-        const userData: User = { name: email.split("@")[0], email, role };
+        const resData = await response.json();
+        const userData: User = {
+          id: resData.user_id,
+          name: email.split("@")[0],
+          email,
+          role,
+        };
         setUser(userData);
-        router.push(`/dashboard/${role}`);
+        router.push(`/dashboard/${userData.role}`);
       } catch (error) {
         console.error("Login error:", error);
         alert("Login failed. Please check your credentials.");
@@ -197,11 +215,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
-        await fetch(`${API_URL}/auth/logout`, { method: "POST" });
+        await fetch(`${API_URL}/auth/logout`, { method: "POST", credentials: "include" });
     } catch (e) {
         console.error("Logout failed", e);
     }
     setUser(null)
+    setIsAuthLoading(false)
     router.push("/login")
   }, [router])
 
@@ -226,6 +245,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
+        isAuthLoading,
         isAuthenticated: !!user,
         login,
         signup,

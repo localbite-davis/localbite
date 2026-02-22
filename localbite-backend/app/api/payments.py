@@ -60,6 +60,7 @@ def mock_stripe_checkout(session_id: str):
     
     session_data = MOCK_STRIPE_SESSIONS[session_id]
     amount = session_data["amount"]
+    order_id = session_data["order_id"]
     
     # Return HTML with redirect options (simulating Stripe checkout)
     html_content = f"""
@@ -142,10 +143,10 @@ def mock_stripe_checkout(session_id: str):
             <div class="amount">${amount / 100:.2f}</div>
             <p>Test Card: 4242 4242 4242 4242</p>
             <div class="buttons">
-                <form action="http://localhost:3000/dashboard/customer/payment/success?session_id={session_id}" method="get" style="flex: 1;">
+                <form action="http://localhost:3000/dashboard/customer/payment/success?session_id={session_id}&order_id={order_id}" method="get" style="flex: 1;">
                     <button type="submit" class="btn-success" style="width: 100%;">✓ Pay Successfully</button>
                 </form>
-                <form action="http://localhost:3000/dashboard/customer/payment/cancel?session_id={session_id}" method="get" style="flex: 1;">
+                <form action="http://localhost:3000/dashboard/customer/payment/cancel?session_id={session_id}&order_id={order_id}" method="get" style="flex: 1;">
                     <button type="submit" class="btn-cancel" style="width: 100%;">✕ Cancel Payment</button>
                 </form>
             </div>

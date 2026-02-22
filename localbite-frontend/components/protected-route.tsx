@@ -10,23 +10,27 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, allowedRole }: ProtectedRouteProps) {
-  const { isAuthenticated, user } = useAuth()
+  const { isAuthenticated, isAuthLoading, user } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
+    if (isAuthLoading) return
+
     if (!isAuthenticated) {
       router.replace("/login")
     } else if (user?.role !== allowedRole) {
       router.replace(`/dashboard/${user?.role}`)
     }
-  }, [isAuthenticated, user, allowedRole, router])
+  }, [isAuthLoading, isAuthenticated, user, allowedRole, router])
 
-  if (!isAuthenticated || user?.role !== allowedRole) {
+  if (isAuthLoading || !isAuthenticated || user?.role !== allowedRole) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          <p className="text-sm text-muted-foreground">Redirecting...</p>
+          <p className="text-sm text-muted-foreground">
+            {isAuthLoading ? "Checking session..." : "Redirecting..."}
+          </p>
         </div>
       </div>
     )

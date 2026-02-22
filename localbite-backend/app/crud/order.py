@@ -27,6 +27,17 @@ def get_by_user_id(db: Session, user_id: int, skip: int = 0, limit: int = 100) -
 def list_all(db: Session, skip: int = 0, limit: int = 100) -> list[Order]:
     return db.query(Order).offset(skip).limit(limit).all()
 
+
+def list_by_user(db: Session, user_id: int, skip: int = 0, limit: int = 100) -> list[Order]:
+    return (
+        db.query(Order)
+        .filter(Order.user_id == user_id)
+        .order_by(Order.created_at.desc(), Order.order_id.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
 def update(db: Session, db_obj: Order, payload: OrderBase) -> Order:
     updates = payload.model_dump(exclude_unset=True)
     for field, value in updates.items():

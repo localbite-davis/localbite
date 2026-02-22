@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/context/auth-context"
-import { generateIdempotencyKey } from "@/lib/api/payments"
 import { Button } from "@/components/ui/button"
 import { AlertCircle, Loader2 } from "lucide-react"
 
@@ -21,17 +20,20 @@ export default function PaymentPage() {
 
   const orderId = searchParams.get("orderId")
   const amountParam = searchParams.get("amount")
+  const deliveryAddressParam = searchParams.get("deliveryAddress")
 
   useEffect(() => {
     const initPayment = async () => {
       try {
         if (!user?.id) {
           setError("User information not available")
+          setPaymentReady(true) // Set ready even on error to show error message
           return
         }
 
         if (!orderId) {
           setError("Order ID not found. Please place an order first.")
+          setPaymentReady(true) // Set ready even on error to show error message
           return
         }
 
@@ -72,11 +74,28 @@ export default function PaymentPage() {
         setPaymentReady(true)
       } catch (err) {
         setError("Failed to initialize payment")
+        setPaymentReady(true) // Set ready even on error to show error message
       }
     }
 
-    if (orderId && user?.id) {
-      initPayment()
+    if (orderId) {
+      if (user?.id) {
+        initPayment()
+      } else {
+        // Wait a bit for user to load
+        const timer = setTimeout(() => {
+          if (!user?.id) {
+            setError("User information not available")
+            setPaymentReady(true)
+          } else {
+            initPayment()
+          }
+        }, 1000)
+        return () => clearTimeout(timer)
+      }
+    } else {
+      setError("Order ID not found. Please place an order first.")
+      setPaymentReady(true)
     }
   }, [orderId, amountParam, user?.id])
 
@@ -87,6 +106,17 @@ export default function PaymentPage() {
     setError(null)
 
     try {
+      if (typeof window !== "undefined" && orderId) {
+        window.sessionStorage.setItem(
+          "pending_dispatch_context",
+          JSON.stringify({
+            orderId,
+            deliveryAddress:
+              deliveryAddressParam || "Segundo Dining Commons, Davis, CA",
+          })
+        )
+      }
+
       // Create Stripe checkout session directly with order info
       // Skip full payment creation for now, just use order data
       const checkoutResponse = await fetch(

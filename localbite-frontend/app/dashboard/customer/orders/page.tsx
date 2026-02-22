@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { useAuth } from "@/context/auth-context"
 import { getUserOrders, Order } from "@/lib/api/orders"
 import { getMenuItem } from "@/lib/api/menu"
+import { getDispatchStatus, type DispatchStatusResponse } from "@/lib/api/dispatch"
 import {
   Clock,
   CheckCircle2,
@@ -20,6 +21,8 @@ const statusConfig = {
   placed: { label: "Order Placed", icon: Package, color: "bg-secondary text-secondary-foreground" },
   preparing: { label: "Preparing", icon: ChefHat, color: "bg-accent/20 text-accent-foreground" },
   bidding: { label: "Finding Driver", icon: Users, color: "bg-primary/20 text-primary" },
+  all_agents_bidding: { label: "Expanding to All Drivers", icon: Users, color: "bg-primary/20 text-primary" },
+  needs_fee_increase: { label: "Increase Delivery Fee Needed", icon: AlertCircle, color: "bg-destructive/10 text-destructive" },
   on_the_way: { label: "On the Way", icon: Truck, color: "bg-accent/20 text-accent-foreground" },
   delivered: { label: "Delivered", icon: CheckCircle2, color: "bg-secondary text-muted-foreground" },
 }
@@ -33,6 +36,9 @@ const timelineSteps = [
 ]
 
 function getStepIndex(status: string) {
+  if (status === "all_agents_bidding" || status === "needs_fee_increase") {
+    return timelineSteps.findIndex((s) => s.key === "bidding")
+  }
   return timelineSteps.findIndex((s) => s.key === status)
 }
 
@@ -52,6 +58,7 @@ export default function OrdersPage() {
   const { user } = useAuth()
   const [orders, setOrders] = useState<Order[]>([])
   const [menuItemCache, setMenuItemCache] = useState<Record<number, string>>({})
+  const [dispatchStatusMap, setDispatchStatusMap] = useState<Record<number, DispatchStatusResponse>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -63,7 +70,9 @@ export default function OrdersPage() {
           return
         }
 
-        const userOrders = await getUserOrders(user.id)
+        const userId =
+          typeof user.id === "string" ? parseInt(user.id, 10) : user.id
+        const userOrders = await getUserOrders(userId)
         setOrders(userOrders)
 
         // Fetch menu item names for all items in orders
@@ -103,8 +112,70 @@ export default function OrdersPage() {
     }
   }, [user?.id])
 
+  useEffect(() => {
+    if (orders.length === 0) {
+      setDispatchStatusMap({})
+      return
+    }
+
+    let cancelled = false
+    const activeOrders = orders.filter(
+      (order) => !["delivered", "cancelled"].includes(order.order_status)
+    )
+
+    if (activeOrders.length === 0) {
+      setDispatchStatusMap({})
+      return
+    }
+
+    const loadDispatchStatuses = async () => {
+      try {
+        const entries = await Promise.all(
+          activeOrders.map(async (order) => {
+            const status = await getDispatchStatus(order.order_id)
+            return [order.order_id, status] as const
+          })
+        )
+        if (!cancelled) {
+          setDispatchStatusMap(Object.fromEntries(entries))
+        }
+      } catch (err) {
+        console.error("Failed to fetch dispatch statuses:", err)
+      }
+    }
+
+    loadDispatchStatuses()
+    const interval = setInterval(loadDispatchStatuses, 5000)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [orders])
+
+  function mapDispatchToFrontendStatus(
+    backendStatus: string,
+    dispatch?: DispatchStatusResponse
+  ): string {
+    if (!dispatch) return mapBackendStatus(backendStatus)
+
+    if (dispatch.status === "needs_fee_increase") return "needs_fee_increase"
+    if (
+      ["starting", "broadcasted", "waiting_for_bids", "escalating"].includes(dispatch.status)
+    ) {
+      if (dispatch.phase === "all_agents") return "all_agents_bidding"
+      return "bidding"
+    }
+
+    if (dispatch.status === "assigned" || dispatch.phase === "completed") {
+      return "on_the_way"
+    }
+
+    return mapBackendStatus(backendStatus)
+  }
+
   // Convert backend orders to frontend format
   const formattedOrders = orders.map((order) => ({
+    orderId: order.order_id,
     id: `ORD-${order.order_id}`,
     restaurant: order.restaurant?.name || `Restaurant ${order.restaurant_id}`,
     items: order.order_items.map((item) => ({
@@ -112,10 +183,10 @@ export default function OrdersPage() {
       quantity: item.quantity,
     })),
     total: order.base_fare + order.delivery_fee + order.commission_amount,
-    status: mapBackendStatus(order.order_status),
+    status: mapDispatchToFrontendStatus(order.order_status, dispatchStatusMap[order.order_id]),
     date: order.created_at,
     eta: "15-20 min",
-    driver: null,
+    driver: null as string | null,
     driverRating: 4.8,
   }))
 
@@ -126,6 +197,7 @@ export default function OrdersPage() {
 
   const activeOrder = sortedOrders.find((o) => o.status !== "delivered")
   const pastOrders = sortedOrders.filter((o) => o.status === "delivered")
+  const activeDispatchStatus = activeOrder ? dispatchStatusMap[activeOrder.orderId] : undefined
 
   if (loading) {
     return (
@@ -238,6 +310,25 @@ export default function OrdersPage() {
                     })}
                   </div>
                 </div>
+
+                {activeDispatchStatus && (
+                  <div className="mt-4 rounded-xl bg-secondary p-3 text-sm">
+                    <p className="font-medium text-secondary-foreground">
+                      Dispatch phase:{" "}
+                      <span className="capitalize">
+                        {activeDispatchStatus.phase.replace(/_/g, " ")}
+                      </span>
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {activeDispatchStatus.note || "Looking for a delivery partner"}
+                    </p>
+                    {activeDispatchStatus.status === "needs_fee_increase" && (
+                      <div className="mt-3 rounded-lg bg-destructive/10 p-3 text-xs text-destructive">
+                        No driver accepted the current fee. Prompt the customer to increase the delivery fee.
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Driver info */}
                 {activeOrder.driver && (

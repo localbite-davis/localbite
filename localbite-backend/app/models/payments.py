@@ -6,6 +6,10 @@ from sqlalchemy.sql import func
 from app.database import Base
 
 
+def _enum_values(enum_cls):
+    return [member.value for member in enum_cls]
+
+
 class PaymentStatus(str, PyEnum):
     CREATED = "created"
     AUTHORIZED = "authorized"
@@ -39,7 +43,12 @@ class Payment(Base):
     merchant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
 
     provider = Column(
-        Enum(PaymentProvider, name="payment_provider_enum"),
+        Enum(
+            PaymentProvider,
+            name="payment_provider_enum",
+            values_callable=_enum_values,
+            validate_strings=True,
+        ),
         nullable=False,
         default=PaymentProvider.STRIPE,
     )
@@ -55,12 +64,22 @@ class Payment(Base):
 
     currency = Column(String, default="USD", nullable=False)
     payment_method = Column(
-        Enum(PaymentMethodType, name="payment_method_type_enum"),
+        Enum(
+            PaymentMethodType,
+            name="payment_method_type_enum",
+            values_callable=_enum_values,
+            validate_strings=True,
+        ),
         nullable=False,
     )
 
     status = Column(
-        Enum(PaymentStatus, name="payment_status_enum"),
+        Enum(
+            PaymentStatus,
+            name="payment_status_enum",
+            values_callable=_enum_values,
+            validate_strings=True,
+        ),
         nullable=False,
         default=PaymentStatus.CREATED,
     )

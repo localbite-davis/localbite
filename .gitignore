@@ -137,6 +137,7 @@ celerybeat.pid
 # Environments
 .env
 .envrc
+localbite-backend/postman/reports/
 .venv
 env/
 venv/

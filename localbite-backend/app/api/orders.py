@@ -13,11 +13,6 @@ router = APIRouter(prefix="/orders", tags=["Orders"])
 def create_order(payload: OrderCreate, db: Session = Depends(get_db)):
     return crud_order.create(db=db, payload=payload)
 
-@router.get("/user/{user_id}", response_model=List[OrderOut])
-def get_user_orders(user_id: int, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    orders = crud_order.get_by_user_id(db, user_id=user_id, skip=skip, limit=limit)
-    return orders
-
 @router.get("/{order_id}", response_model=OrderOut)
 def get_order(order_id: int, db: Session = Depends(get_db)):
     db_obj = crud_order.get_by_id(db, order_id=order_id)
@@ -28,6 +23,16 @@ def get_order(order_id: int, db: Session = Depends(get_db)):
 @router.get("/", response_model=List[OrderOut])
 def list_orders(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return crud_order.list_all(db, skip=skip, limit=limit)
+
+
+@router.get("/user/{user_id}", response_model=List[OrderOut])
+def list_orders_by_user(
+    user_id: int,
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+):
+    return crud_order.list_by_user(db, user_id=user_id, skip=skip, limit=limit)
 
 @router.put("/{order_id}", response_model=OrderOut)
 def update_order(order_id: int, payload: OrderUpdate, db: Session = Depends(get_db)):

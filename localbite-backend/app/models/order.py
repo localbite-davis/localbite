@@ -15,7 +15,12 @@ class Order(Base):
     delivery_fee = Column(Float, nullable=False)
     commission_amount = Column(Float, nullable=False)
     order_status = Column(String, default="pending")
+    delivery_proof_ref = Column(String, nullable=True)
+    delivery_proof_filename = Column(String, nullable=True)
+    agent_payout_amount = Column(Float, nullable=True)
+    agent_payout_status = Column(String, nullable=True, default="pending")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    delivered_at = Column(DateTime(timezone=True), nullable=True)
     
     # Relationships
     user = relationship("User", back_populates="orders")

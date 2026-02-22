@@ -1,47 +1,28 @@
 "use client"
 
-import { useState } from "react"
+import { useState, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { useAuth, type UserRole } from "@/context/auth-context"
-import {
-  UtensilsCrossed,
-  Bike,
-  Store,
-  ArrowLeft,
-  Eye,
-  EyeOff,
-} from "lucide-react"
+import { UtensilsCrossed, Bike, Store, ArrowLeft, Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Suspense } from "react"
 
+// Full roles
 const roles: {
   value: UserRole
   label: string
   icon: typeof UtensilsCrossed
   description: string
 }[] = [
-  {
-    value: "customer",
-    label: "Customer",
-    icon: UtensilsCrossed,
-    description: "Order food from Davis restaurants",
-  },
-  {
-    value: "agent",
-    label: "Delivery Agent",
-    icon: Bike,
-    description: "Deliver food and earn money",
-  },
-  {
-    value: "restaurant",
-    label: "Restaurant",
-    icon: Store,
-    description: "Manage orders and grow your business",
-  },
+  { value: "customer", label: "Student", icon: UtensilsCrossed, description: "Order food from Davis restaurants" },
+  { value: "agent", label: "Delivery Agent", icon: Bike, description: "Deliver food and earn money" },
+  { value: "restaurant", label: "Restaurant", icon: Store, description: "Manage orders and grow your business" },
 ]
+
+// Only for delivery agent types
+const agentTypes = ["Student Agent", "Professional Agent"]
 
 function SignupForm() {
   const { signup } = useAuth()
@@ -56,26 +37,37 @@ function SignupForm() {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [studentId, setStudentId] = useState("")
+  const [agentType, setAgentType] = useState(agentTypes[0])
   const [showPassword, setShowPassword] = useState(false)
 
   const handleSignup = (e: React.FormEvent) => {
     e.preventDefault()
-    if (selectedRole) {
-      signup(name, email, password, selectedRole)
+    if (!selectedRole) return
+
+    // Simple validation
+    if (selectedRole === "customer" && !studentId) {
+      alert("Please enter your student ID")
+      return
     }
+
+    if (selectedRole === "agent" && !agentType) {
+      alert("Please select agent type")
+      return
+    }
+
+    signup(
+      name,
+      email,
+      password,
+      selectedRole,
+      selectedRole === "customer" ? studentId : selectedRole === "agent" ? agentType : undefined
+    )
   }
 
   return (
     <div className="w-full max-w-md">
-      <Link href="/" className="mb-8 flex items-center gap-2 lg:hidden hover:opacity-80 transition-opacity">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary">
-          <UtensilsCrossed className="h-5 w-5 text-primary-foreground" />
-        </div>
-        <span className="text-xl font-bold text-foreground">
-          Aggie<span className="text-accent">Bites</span>
-        </span>
-      </Link>
-
+      {/* Role Selection */}
       {!selectedRole ? (
         <div className="animate-slide-up">
           <h1 className="text-2xl font-bold text-foreground">Create account</h1>
@@ -93,22 +85,15 @@ function SignupForm() {
                   <role.icon className="h-5 w-5" />
                 </div>
                 <div className="flex-1">
-                  <p className="font-semibold text-card-foreground">
-                    {role.label}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {role.description}
-                  </p>
+                  <p className="font-semibold text-card-foreground">{role.label}</p>
+                  <p className="text-sm text-muted-foreground">{role.description}</p>
                 </div>
               </button>
             ))}
           </div>
           <p className="mt-8 text-center text-sm text-muted-foreground">
             Already have an account?{" "}
-            <Link
-              href="/login"
-              className="font-medium text-primary hover:underline"
-            >
+            <Link href="/login" className="font-medium text-primary hover:underline">
               Log in
             </Link>
           </p>
@@ -122,58 +107,77 @@ function SignupForm() {
             <ArrowLeft className="h-4 w-4" />
             Change role
           </button>
-          <div className="mb-6 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-              {(() => {
-                const r = roles.find((r) => r.value === selectedRole)
-                return r ? <r.icon className="h-5 w-5" /> : null
-              })()}
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-foreground">
-                {roles.find((r) => r.value === selectedRole)?.label} Sign Up
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Create your account
-              </p>
-            </div>
-          </div>
+
+          <h1 className="text-xl font-bold text-foreground mb-4">
+            {roles.find((r) => r.value === selectedRole)?.label} Sign Up
+          </h1>
 
           <form onSubmit={handleSignup} className="space-y-4">
+            {/* Name */}
             <div className="space-y-2">
-              <Label htmlFor="name">
-                {selectedRole === "restaurant" ? "Restaurant Name" : "Full Name"}
-              </Label>
+              <Label htmlFor="name">{selectedRole === "restaurant" ? "Restaurant Name" : "Full Name"}</Label>
               <Input
                 id="name"
                 type="text"
-                placeholder={
-                  selectedRole === "restaurant"
-                    ? "Davis Grill"
-                    : "Alex Chen"
-                }
+                placeholder={selectedRole === "restaurant" ? "Davis Grill" : "Alex Chen"}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="rounded-xl"
                 required
               />
             </div>
+
+            {/* Email */}
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder={
-                  selectedRole === "restaurant"
-                    ? "info@yourrestaurant.com"
-                    : "you@ucdavis.edu"
-                }
+                placeholder={selectedRole === "restaurant" ? "info@yourrestaurant.com" : "you@ucdavis.edu"}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="rounded-xl"
                 required
               />
             </div>
+
+            {/* Student ID */}
+            {selectedRole === "customer" && (
+              <div className="space-y-2">
+                <Label htmlFor="studentId">Student ID</Label>
+                <Input
+                  id="studentId"
+                  type="text"
+                  placeholder="12345678"
+                  value={studentId}
+                  onChange={(e) => setStudentId(e.target.value)}
+                  className="rounded-xl"
+                  required
+                />
+              </div>
+            )}
+
+            {/* Agent Type */}
+            {selectedRole === "agent" && (
+              <div className="space-y-2">
+                <Label htmlFor="agentType">Agent Type</Label>
+                <select
+                  id="agentType"
+                  value={agentType}
+                  onChange={(e) => setAgentType(e.target.value)}
+                  className="w-full rounded-xl border border-border bg-card p-2"
+                  required
+                >
+                  {agentTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Password */}
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <div className="relative">
@@ -191,14 +195,11 @@ function SignupForm() {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
             </div>
+
             <Button
               type="submit"
               className="w-full rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
@@ -210,23 +211,12 @@ function SignupForm() {
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
             Already have an account?{" "}
-            <Link
-              href="/login"
-              className="font-medium text-primary hover:underline"
-            >
+            <Link href="/login" className="font-medium text-primary hover:underline">
               Log in
             </Link>
           </p>
         </div>
       )}
-
-      <Link
-        href="/"
-        className="mt-6 flex items-center justify-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="h-3 w-3" />
-        Back to home
-      </Link>
     </div>
   )
 }
@@ -240,9 +230,7 @@ export default function SignupPage() {
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent">
             <UtensilsCrossed className="h-5 w-5 text-accent-foreground" />
           </div>
-          <span className="text-xl font-bold text-primary-foreground">
-            AggieBites
-          </span>
+          <span className="text-xl font-bold text-primary-foreground">AggieBites</span>
         </Link>
         <div>
           <h2 className="text-balance text-4xl font-bold leading-tight text-primary-foreground">
@@ -252,9 +240,7 @@ export default function SignupPage() {
             Whether you are hungry, want to earn, or run a restaurant -- we have got you covered on campus.
           </p>
         </div>
-        <p className="text-sm text-primary-foreground/50">
-          &copy; 2026 Aggie Bites
-        </p>
+        <p className="text-sm text-primary-foreground/50">&copy; 2026 Aggie Bites</p>
       </div>
 
       {/* Right Panel */}
