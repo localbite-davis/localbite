@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Link from "next/link"
 import { useAuth } from "@/context/auth-context"
 import { useTheme } from "next-themes"
 import {
@@ -216,7 +217,7 @@ export default function RestaurantDashboard() {
     <div className="flex min-h-screen bg-background">
       {/* Sidebar */}
       <aside className="hidden w-64 border-r border-sidebar-border bg-sidebar lg:flex lg:flex-col">
-        <div className="flex items-center gap-2 p-6">
+        <Link href="/dashboard/restaurant" className="flex items-center gap-2 p-6 hover:opacity-80 transition-opacity">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sidebar-primary">
             <Store className="h-5 w-5 text-sidebar-primary-foreground" />
           </div>
@@ -228,7 +229,7 @@ export default function RestaurantDashboard() {
               Restaurant Partner
             </p>
           </div>
-        </div>
+        </Link>
 
         <nav className="flex-1 space-y-1 px-3">
           {[
@@ -287,14 +288,14 @@ export default function RestaurantDashboard() {
         {/* Top bar */}
         <header className="sticky top-0 z-40 border-b border-border/50 bg-background/80 backdrop-blur-xl">
           <div className="flex items-center justify-between px-6 py-3">
-            <div className="flex items-center gap-3 lg:hidden">
+            <Link href="/dashboard/restaurant" className="flex items-center gap-3 lg:hidden hover:opacity-80 transition-opacity">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
                 <Store className="h-4 w-4 text-primary-foreground" />
               </div>
               <span className="text-lg font-bold text-foreground">
                 Aggie<span className="text-accent">Bites</span>
               </span>
-            </div>
+            </Link>
             <h1 className="hidden text-lg font-semibold text-foreground lg:block">
               {activeTab === "orders" && "Orders"}
               {activeTab === "menu" && "Menu Management"}

@@ -67,14 +67,14 @@ function SignupForm() {
 
   return (
     <div className="w-full max-w-md">
-      <div className="mb-8 flex items-center gap-2 lg:hidden">
+      <Link href="/" className="mb-8 flex items-center gap-2 lg:hidden hover:opacity-80 transition-opacity">
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary">
           <UtensilsCrossed className="h-5 w-5 text-primary-foreground" />
         </div>
         <span className="text-xl font-bold text-foreground">
           Aggie<span className="text-accent">Bites</span>
         </span>
-      </div>
+      </Link>
 
       {!selectedRole ? (
         <div className="animate-slide-up">
@@ -236,14 +236,14 @@ export default function SignupPage() {
     <div className="flex min-h-screen">
       {/* Left Panel */}
       <div className="hidden flex-1 flex-col justify-between bg-primary p-12 lg:flex">
-        <div className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent">
             <UtensilsCrossed className="h-5 w-5 text-accent-foreground" />
           </div>
           <span className="text-xl font-bold text-primary-foreground">
             AggieBites
           </span>
-        </div>
+        </Link>
         <div>
           <h2 className="text-balance text-4xl font-bold leading-tight text-primary-foreground">
             Join the Aggie Bites community.

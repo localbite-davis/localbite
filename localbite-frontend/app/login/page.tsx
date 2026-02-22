@@ -38,7 +38,7 @@ const roles: { value: UserRole; label: string; icon: typeof UtensilsCrossed; des
 ]
 
 export default function LoginPage() {
-  const { login } = useAuth()
+  const { login, forgotPassword } = useAuth()
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -55,14 +55,14 @@ export default function LoginPage() {
     <div className="flex min-h-screen">
       {/* Left Panel */}
       <div className="hidden flex-1 flex-col justify-between bg-primary p-12 lg:flex">
-        <div className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent">
             <UtensilsCrossed className="h-5 w-5 text-accent-foreground" />
           </div>
           <span className="text-xl font-bold text-primary-foreground">
             AggieBites
           </span>
-        </div>
+        </Link>
         <div>
           <h2 className="text-balance text-4xl font-bold leading-tight text-primary-foreground">
             Welcome back, Aggie.
@@ -80,14 +80,14 @@ export default function LoginPage() {
       {/* Right Panel */}
       <div className="flex flex-1 items-center justify-center bg-background p-6 lg:p-12">
         <div className="w-full max-w-md">
-          <div className="mb-8 flex items-center gap-2 lg:hidden">
+          <Link href="/" className="mb-8 flex items-center gap-2 lg:hidden hover:opacity-80 transition-opacity">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary">
               <UtensilsCrossed className="h-5 w-5 text-primary-foreground" />
             </div>
             <span className="text-xl font-bold text-foreground">
               Aggie<span className="text-accent">Bites</span>
             </span>
-          </div>
+          </Link>
 
           {!selectedRole ? (
             <div className="animate-slide-up">
@@ -188,6 +188,21 @@ export default function LoginPage() {
                       ) : (
                         <Eye className="h-4 w-4" />
                       )}
+                    </button>
+                  </div>
+                  <div className="flex justify-end pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!email) {
+                          alert("Please enter your email address first");
+                          return;
+                        }
+                        forgotPassword(email);
+                      }}
+                      className="text-xs text-muted-foreground hover:text-primary hover:underline"
+                    >
+                      Forgot password?
                     </button>
                   </div>
                 </div>

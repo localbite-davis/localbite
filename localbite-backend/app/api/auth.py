@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from typing import Union
 from app.database import get_db
 from app.models import User, Restaurant, DeliveryAgent
-from app.schemas.auth import LoginRequest, Token
+from app.schemas.auth import LoginRequest, Token, ForgotPasswordRequest
 from app.core.security import verify_password, create_access_token
 
 load_dotenv()
@@ -86,3 +86,23 @@ def login_delivery_agent(form_data: LoginRequest, response: Response, db: Sessio
 def logout(response: Response):
     response.delete_cookie(key=COOKIE_NAME)
     return {"message": "Logout successful"}
+
+@router.post("/forgot-password")
+def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    # Check if user exists in any of the tables
+    user = db.query(User).filter(User.email == request.email).first()
+    restaurant = db.query(Restaurant).filter(Restaurant.email == request.email).first() 
+    agent = db.query(DeliveryAgent).filter(DeliveryAgent.email == request.email).first()
+
+    if not user and not restaurant and not agent:
+        # In production, avoid leaking user existence
+        # return {"message": "If your email is registered..."}
+        # But for dev/demo, helpful to know if email found:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Email not found in our records."
+         )
+
+    # In a real app, generate a unique token, save it (with expiry) to DB, send email.
+    print(f"PASSWORD RESET REQUEST FOR: {request.email}")
+    return {"message": "If your email is registered, you will receive a password reset link."}

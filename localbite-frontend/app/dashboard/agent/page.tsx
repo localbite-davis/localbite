@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import Link from "next/link"
 import { useAuth } from "@/context/auth-context"
 import { useTheme } from "next-themes"
 import { availableDeliveries, agentStats } from "@/lib/mock-data"
@@ -82,7 +83,7 @@ export default function AgentDashboard() {
       {/* Header */}
       <nav className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 lg:px-6">
-          <div className="flex items-center gap-3">
+          <Link href="/dashboard/agent" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
               <Bike className="h-4 w-4 text-primary-foreground" />
             </div>
@@ -92,7 +93,7 @@ export default function AgentDashboard() {
                 Driver
               </span>
             </span>
-          </div>
+          </Link>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5">
               <div

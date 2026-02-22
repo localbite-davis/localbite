@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 export type UserRole = "customer" | "agent" | "restaurant"
 
 interface User {
+  id?: number
   name: string
   email: string
   role: UserRole
@@ -19,6 +20,7 @@ interface AuthContextType {
   login: (email: string, password: string, role: UserRole) => void
   signup: (name: string, email: string, password: string, role: UserRole, isStudent?: boolean) => void
   logout: () => void
+  forgotPassword: (email: string) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
@@ -203,6 +205,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push("/login")
   }, [router])
 
+  const forgotPassword = useCallback(async (email: string) => {
+    try {
+        const res = await fetch(`${API_URL}/auth/forgot-password`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({email})
+        })
+        if (!res.ok) {
+            const data = await res.json()
+            throw new Error(data.detail || "Failed to reset password")
+        }
+        alert("If your email is registered, you will receive a password reset link.")
+    } catch (e: any) {
+        alert(e.message)
+    }
+  }, [])
+
   return (
     <AuthContext.Provider
       value={{
@@ -211,6 +230,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         signup,
         logout,
+        forgotPassword,
       }}
     >
       {children}
