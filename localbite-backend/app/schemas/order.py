@@ -2,6 +2,13 @@ from pydantic import BaseModel, ConfigDict
 from typing import List, Dict, Optional
 from datetime import datetime
 
+class RestaurantInfo(BaseModel):
+    id: int
+    name: str
+    cuisine_type: str
+    
+    model_config = ConfigDict(from_attributes=True)
+
 class OrderBase(BaseModel):
     user_id: int
     restaurant_id: int
@@ -22,5 +29,4 @@ class OrderUpdate(BaseModel):
 class OrderOut(OrderBase):
     order_id: int
     created_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
+    restaurant: Optional[RestaurantInfo] = None

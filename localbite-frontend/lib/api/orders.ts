@@ -16,7 +16,7 @@ export interface PlaceOrderRequest {
   order_status?: string;
 }
 
-export interface PlaceOrderResponse {
+export interface Order {
   order_id: number;
   user_id: number;
   restaurant_id: number;
@@ -27,7 +27,14 @@ export interface PlaceOrderResponse {
   commission_amount: number;
   order_status: string;
   created_at: string;
+  restaurant?: {
+    id: number;
+    name: string;
+    cuisine_type: string;
+  };
 }
+
+export interface PlaceOrderResponse extends Order {}
 
 export async function placeOrder(
   payload: PlaceOrderRequest
@@ -55,4 +62,23 @@ export async function placeOrder(
     }
     throw new Error("Order placement failed");
   }
+}
+
+export async function getUserOrders(userId: number): Promise<Order[]> {
+  try {
+    const response = await fetch(`${API_URL}/orders/user/${userId}`, {
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch user orders");
+    }
+
+    const data: Order[] = await response.json();
+    return data;
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(`Failed to fetch orders: ${error.message}`);
+    }
+    throw new Error("Failed to fetch user orders");  }
 }

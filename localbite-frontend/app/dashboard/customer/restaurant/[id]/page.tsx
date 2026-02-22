@@ -3,18 +3,20 @@
 import { use, useEffect, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
+import { restaurants as mockRestaurants } from "@/lib/mock-data"
+import { getRestaurantById } from "@/lib/api/restaurants"
+import { getMenuByRestaurant } from "@/lib/api/menu"
 import { useCart } from "@/app/dashboard/customer/layout"
-import { Star, Clock, MapPin, ArrowLeft, Plus, Minus, ShoppingCart } from "lucide-react"
+import { Star, Clock, MapPin, ArrowLeft, Plus, Minus, ShoppingCart, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 
 const API_URL = "http://localhost:8000/api/v1"
 
 interface Restaurant {
-  id: number
+  id: string | number
   name: string
   cuisine_type: string
-  // Mapped/Mocked fields
   image: string
   rating: number
   reviewCount: number
@@ -27,7 +29,7 @@ interface MenuItem {
   item_name: string
   price: number
   description?: string
-  category: string
+  category: string | undefined
   popular?: boolean
 }
 
@@ -38,42 +40,39 @@ export default function RestaurantDetailPage({
 }) {
   const { id } = use(params)
   const { addItem, items } = useCart()
-  const [addedIds, setAddedIds] = useState<number[]>([])
   
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null)
   const [menu, setMenu] = useState<MenuItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState("")
+  const [addedIds, setAddedIds] = useState<number[]>([])
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch Restaurant
-        const resRest = await fetch(`${API_URL}/restaurants/${id}`)
-        if (!resRest.ok) throw new Error("Restaurant not found")
-        const dataRest = await resRest.json()
-
-        setRestaurant({
-          ...dataRest,
-          image: "https://images.unsplash.com/photo-1552566626-52f8b828add9?w=800&q=80",
-          rating: 4.5,
-          reviewCount: 128,
-          eta: "20-30 min",
-          deliveryFee: 1.99,
-        })
-
-        // Fetch Menu
-        // Note: The backend endpoint might serve list by restaurant_id
-        // Try /menu/restaurant/{id} based on previous checks
-        const resMenu = await fetch(`${API_URL}/menu/restaurant/${id}`)
-        if (resMenu.ok) {
-          const dataMenu = await resMenu.json()
-          setMenu(dataMenu)
-        } else {
-          console.warn("Could not fetch menu")
-          setMenu([])
+        // Fetch restaurant data
+        const restaurantData = await getRestaurantById(parseInt(id))
+        
+        // Find mock data for image and other display fields
+        const mockRest = mockRestaurants.find(
+          (m) => m.name.toLowerCase() === restaurantData.name.toLowerCase()
+        )
+        
+        const enrichedRestaurant: Restaurant = {
+          id: restaurantData.id,
+          name: restaurantData.name,
+          cuisine_type: restaurantData.cuisine_type,
+          image: mockRest?.image || "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&h=400&fit=crop",
+          rating: mockRest?.rating || 4.5,
+          reviewCount: mockRest?.reviewCount || 100,
+          eta: mockRest?.eta || "20-30 min",
+          deliveryFee: mockRest?.deliveryFee || 2.49,
         }
-
+        setRestaurant(enrichedRestaurant)
+        
+        // Fetch menu items
+        const menuData = await getMenuByRestaurant(parseInt(id))
+        setMenu(menuData as MenuItem[])
       } catch (err) {
         console.error(err)
         setError("Could not load restaurant details.")
@@ -87,13 +86,12 @@ export default function RestaurantDetailPage({
     }
   }, [id])
 
-
   if (loading) {
-     return (
-        <div className="flex h-64 items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-        </div>
-     )
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
   }
 
   if (error || !restaurant) {
@@ -111,7 +109,7 @@ export default function RestaurantDetailPage({
     )
   }
 
-  // Group menu by category. Handle items with no category.
+  // Group menu by category
   const categories = Array.from(new Set(menu.map((m) => m.category || "Uncategorized")))
 
   const handleAdd = (item: MenuItem) => {

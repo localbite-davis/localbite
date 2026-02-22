@@ -15,27 +15,13 @@ def create_menu_item(payload: MenuItemCreate, db: Session = Depends(get_db)):
     # It will raise IntegrityError if restaurant_id doesn't exist.
     return crud_menu.create(db=db, payload=payload)
 
+@router.get("/restaurant/{restaurant_id}", response_model=List[MenuItemOut])
+def get_menu_by_restaurant(restaurant_id: int, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    return crud_menu.list_by_restaurant(db, restaurant_id=restaurant_id, skip=skip, limit=limit)
+
 @router.get("/{menu_id}", response_model=MenuItemOut)
 def get_menu_item(menu_id: int, db: Session = Depends(get_db)):
     db_obj = crud_menu.get_by_id(db, menu_id=menu_id)
     if not db_obj:
         raise HTTPException(status_code=404, detail="Menu item not found")
     return db_obj
-
-@router.get("/restaurant/{restaurant_id}", response_model=List[MenuItemOut])
-def get_menu_by_restaurant(restaurant_id: int, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return crud_menu.list_by_restaurant(db, restaurant_id=restaurant_id, skip=skip, limit=limit)
-
-@router.put("/{menu_id}", response_model=MenuItemOut)
-def update_menu_item(menu_id: int, payload: MenuItemUpdate, db: Session = Depends(get_db)):
-    db_obj = crud_menu.get_by_id(db, menu_id=menu_id)
-    if not db_obj:
-        raise HTTPException(status_code=404, detail="Menu item not found")
-    return crud_menu.update(db=db, db_obj=db_obj, payload=payload)
-
-@router.delete("/{menu_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_menu_item(menu_id: int, db: Session = Depends(get_db)):
-    db_obj = crud_menu.get_by_id(db, menu_id=menu_id)
-    if not db_obj:
-        raise HTTPException(status_code=404, detail="Menu item not found")
-    crud_menu.delete(db=db, db_obj=db_obj)
