@@ -21,6 +21,9 @@ def create(db: Session, payload: OrderCreate) -> Order:
 def get_by_id(db: Session, order_id: int) -> Order | None:
     return db.query(Order).filter(Order.order_id == order_id).first()
 
+def get_by_user_id(db: Session, user_id: int, skip: int = 0, limit: int = 100) -> list[Order]:
+    return db.query(Order).filter(Order.user_id == user_id).offset(skip).limit(limit).all()
+
 def list_all(db: Session, skip: int = 0, limit: int = 100) -> list[Order]:
     return db.query(Order).offset(skip).limit(limit).all()
 

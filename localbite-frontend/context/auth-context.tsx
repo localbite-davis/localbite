@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react"
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 
 export type UserRole = "customer" | "agent" | "restaurant"
@@ -28,6 +28,34 @@ const API_URL = "http://localhost:8000/api/v1";
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const router = useRouter()
+
+  // Verify user session on mount
+  useEffect(() => {
+    const verifySession = async () => {
+      try {
+        // Try to get current user info from backend
+        const response = await fetch(`${API_URL}/users/me`, {
+          credentials: "include",
+        })
+        
+        if (response.ok) {
+          const userData = await response.json()
+          const user: User = {
+            id: userData.id,
+            name: userData.first_name,
+            email: userData.email,
+            role: userData.role || "customer",
+          }
+          setUser(user)
+        }
+      } catch (error) {
+        // Session doesn't exist or expired, user stays logged out
+        console.log("No active session found")
+      }
+    }
+
+    verifySession()
+  }, [])
 
   const login = useCallback(
     async (email: string, password: string, role: UserRole) => {

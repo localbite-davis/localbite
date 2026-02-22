@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
 
@@ -26,3 +27,6 @@ class User(Base):
     lifetime_spent = Column(Float, default=0.0)
 
     created_at = Column(DateTime, server_default=func.now())
+    
+    # Relationships
+    orders = relationship("Order", back_populates="user")

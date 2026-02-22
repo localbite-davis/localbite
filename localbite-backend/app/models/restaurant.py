@@ -1,5 +1,6 @@
 
 from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
 
@@ -21,3 +22,6 @@ class Restaurant(Base):
     is_active = Column(Boolean, default=True)
     is_approved = Column(Boolean, default=False)
     created_at = Column(DateTime, server_default=func.now())
+    
+    # Relationships
+    orders = relationship("Order", back_populates="restaurant")

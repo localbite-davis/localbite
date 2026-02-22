@@ -13,6 +13,11 @@ router = APIRouter(prefix="/orders", tags=["Orders"])
 def create_order(payload: OrderCreate, db: Session = Depends(get_db)):
     return crud_order.create(db=db, payload=payload)
 
+@router.get("/user/{user_id}", response_model=List[OrderOut])
+def get_user_orders(user_id: int, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    orders = crud_order.get_by_user_id(db, user_id=user_id, skip=skip, limit=limit)
+    return orders
+
 @router.get("/{order_id}", response_model=OrderOut)
 def get_order(order_id: int, db: Session = Depends(get_db)):
     db_obj = crud_order.get_by_id(db, order_id=order_id)

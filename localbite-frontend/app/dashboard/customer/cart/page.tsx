@@ -39,7 +39,7 @@ export default function CartPage() {
 
     try {
       const restaurantId = parseInt(items[0].restaurantId)
-      const userId = user.id || 1
+      const userId = typeof user.id === "string" ? parseInt(user.id) : user.id || 1
 
       const orderItems = items.map((item) => ({
         item_id: getDatabaseMenuItemId(item.id),
@@ -57,9 +57,11 @@ export default function CartPage() {
         order_status: "pending",
       }
 
-      await placeOrder(orderPayload)
+      const orderResult = await placeOrder(orderPayload)
       clearCart()
-      router.push("/dashboard/customer/orders")
+      // Pass the actual amount as query parameter (in cents)
+      const amountInCents = Math.round(grandTotal * 100)
+      router.push(`/dashboard/customer/payment?orderId=${orderResult.order_id}&amount=${amountInCents}`)
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Failed to place order"

@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, Float, String, JSON, ForeignKey, DateTime
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
 
@@ -15,3 +16,7 @@ class Order(Base):
     commission_amount = Column(Float, nullable=False)
     order_status = Column(String, default="pending")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    user = relationship("User", back_populates="orders")
+    restaurant = relationship("Restaurant", back_populates="orders")
