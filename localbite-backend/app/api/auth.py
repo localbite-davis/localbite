@@ -36,7 +36,14 @@ def create_auth_cookie(response: Response, user_email: str, user_type: str, user
         samesite="lax",
         secure=False, # Set to True in production with HTTPS
     )
-    return {"message": "Login successful", "access_token": access_token, "token_type": "bearer"}
+    return {
+        "message": "Login successful", 
+        "access_token": access_token, 
+        "token_type": "bearer",
+        "user_id": user_id,
+        "user_type": user_type,
+        "email": user_email
+    }
 
 @router.post("/login/user")
 def login_user(form_data: LoginRequest, response: Response, db: Session = Depends(get_db)):

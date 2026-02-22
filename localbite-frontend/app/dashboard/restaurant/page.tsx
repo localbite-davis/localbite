@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useAuth } from "@/context/auth-context"
 import { useTheme } from "next-themes"
 import {
@@ -35,6 +35,23 @@ import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Label } from "@/components/ui/label"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 
 type OrderStatus = "new" | "preparing" | "ready"
 
@@ -72,6 +89,97 @@ export default function RestaurantDashboard() {
   const [orders, setOrders] = useState(restaurantOrders)
   const [menuItems, setMenuItems] = useState(restaurantMenuItems)
   const [orderFilter, setOrderFilter] = useState<"all" | OrderStatus>("all")
+
+  // Menu Management State
+  const [isAddItemOpen, setIsAddItemOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [newItem, setNewItem] = useState({
+    name: "",
+    price: "",
+    category: "Main Course",
+    description: "",
+  })
+
+  // Fetch Menu Items
+  useEffect(() => {
+    if (activeTab === "menu" && user?.id) {
+      const fetchMenuItems = async () => {
+        try {
+          const response = await fetch(`http://localhost:8000/api/v1/menu/restaurant/${user.id}`)
+          if (response.ok) {
+            const data = await response.json()
+            // Map backend fields to frontend expected format
+            const mappedItems = data.map((item: any) => ({
+              id: item.menu_id,
+              name: item.item_name,
+              price: item.price,
+              category: item.category || "Main Course",
+              available: item.availability,
+              description: "", // Backend doesn't support description yet
+              sold: 0, // Mock for now
+              rating: 0, // Mock for now
+            }))
+            setMenuItems(mappedItems)
+          } else {
+            console.error("Failed to fetch menu items")
+          }
+        } catch (error) {
+          console.error("Error fetching menu items:", error)
+        }
+      }
+
+      fetchMenuItems()
+    }
+  }, [activeTab, user?.id])
+
+  const handleAddItem = async () => {
+    if (!user?.id) return;
+    
+    setLoading(true);
+    try {
+      const payload = {
+        restaurant_id: user.id,
+        item_name: newItem.name,
+        price: parseFloat(newItem.price),
+        category: newItem.category,
+        availability: true
+      };
+
+      const response = await fetch("http://localhost:8000/api/v1/menu/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Add to local state
+        const addedItem = {
+           id: data.menu_id,
+           name: data.item_name,
+           price: data.price,
+           category: data.category || "Main Course",
+           available: data.availability,
+           description: "",
+           sold: 0,
+           rating: 0
+        };
+        setMenuItems(prev => [...prev, addedItem]);
+        setIsAddItemOpen(false);
+        setNewItem({ name: "", price: "", category: "Main Course", description: "" });
+      } else {
+        const err = await response.json();
+        alert(`Failed to add item: ${err.detail || "Unknown error"}`);
+      }
+    } catch (error) {
+       console.error("Error adding item:", error);
+       alert("Error adding item");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const updateOrderStatus = (orderId: string) => {
     setOrders((prev) =>
@@ -324,13 +432,77 @@ export default function RestaurantDashboard() {
                 <p className="text-sm text-muted-foreground">
                   {menuItems.length} items
                 </p>
-                <Button
-                  size="sm"
-                  className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
-                >
-                  <Plus className="mr-1.5 h-3.5 w-3.5" />
-                  Add Item
-                </Button>
+                <Dialog open={isAddItemOpen} onOpenChange={setIsAddItemOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    size="sm"
+                    className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
+                    onClick={() => setIsAddItemOpen(true)}
+                  >
+                    <Plus className="mr-1.5 h-3.5 w-3.5" />
+                    Add Item
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add New Menu Item</DialogTitle>
+                    <DialogDescription>
+                      Create a new item for your restaurant's menu.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="name" className="text-right">
+                        Name
+                      </Label>
+                      <Input
+                        id="name"
+                        value={newItem.name}
+                        onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
+                        className="col-span-3"
+                      />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="price" className="text-right">
+                        Price
+                      </Label>
+                      <Input
+                        id="price"
+                        type="number"
+                        value={newItem.price}
+                        onChange={(e) => setNewItem({ ...newItem, price: e.target.value })}
+                        className="col-span-3"
+                      />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="category" className="text-right">
+                        Category
+                      </Label>
+                       <Select
+                        onValueChange={(value) =>
+                          setNewItem({ ...newItem, category: value })
+                        }
+                        defaultValue={newItem.category}
+                      >
+                        <SelectTrigger className="col-span-3">
+                          <SelectValue placeholder="Select a category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Main Course">Main Course</SelectItem>
+                          <SelectItem value="Appetizer">Appetizer</SelectItem>
+                          <SelectItem value="Dessert">Dessert</SelectItem>
+                          <SelectItem value="Drink">Drink</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button onClick={handleAddItem} disabled={loading}>
+                        {loading ? "Adding..." : "Add Item"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
               </div>
 
               <div className="space-y-3">
