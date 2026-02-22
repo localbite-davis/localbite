@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/context/auth-context"
-import { generateIdempotencyKey } from "@/lib/api/payments"
 import { Button } from "@/components/ui/button"
 import { AlertCircle, Loader2 } from "lucide-react"
 
@@ -21,6 +20,7 @@ export default function PaymentPage() {
 
   const orderId = searchParams.get("orderId")
   const amountParam = searchParams.get("amount")
+  const deliveryAddressParam = searchParams.get("deliveryAddress")
 
   useEffect(() => {
     const initPayment = async () => {
@@ -106,6 +106,17 @@ export default function PaymentPage() {
     setError(null)
 
     try {
+      if (typeof window !== "undefined" && orderId) {
+        window.sessionStorage.setItem(
+          "pending_dispatch_context",
+          JSON.stringify({
+            orderId,
+            deliveryAddress:
+              deliveryAddressParam || "Segundo Dining Commons, Davis, CA",
+          })
+        )
+      }
+
       // Create Stripe checkout session directly with order info
       // Skip full payment creation for now, just use order data
       const checkoutResponse = await fetch(

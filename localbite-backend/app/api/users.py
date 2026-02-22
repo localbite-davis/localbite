@@ -1,11 +1,81 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from app.crud import users as users_crud
 from app.database import get_db
 from app.schemas.users import UserCreate, UserOut, UserUpdate
+from app.models.users import User
+from app.models.restaurant import Restaurant
+from app.models.delivery_agent import DeliveryAgent
+from app.core.security import SECRET_KEY, ALGORITHM
+from jose import JWTError, jwt
 
 router = APIRouter(prefix="/users", tags=["users"])
+
+
+@router.get("/me")
+def get_current_user_profile(request: Request, db: Session = Depends(get_db)):
+    cookie_value = request.cookies.get("access_token")
+    if not cookie_value:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    token = cookie_value
+    if token.startswith("Bearer "):
+        token = token.split(" ", 1)[1].strip()
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid authentication token")
+
+    user_type = payload.get("user_type")
+    user_id = payload.get("user_id")
+    email = payload.get("sub")
+
+    if not user_type or not user_id or not email:
+        raise HTTPException(status_code=401, detail="Invalid authentication payload")
+
+    if user_type == "user":
+        user = db.query(User).filter(User.id == int(user_id)).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        return {
+            "id": user.id,
+            "email": user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "name": f"{user.first_name} {user.last_name}".strip(),
+            "role": "customer",
+            "user_type": user_type,
+        }
+
+    if user_type == "restaurant":
+        restaurant = db.query(Restaurant).filter(Restaurant.id == int(user_id)).first()
+        if not restaurant:
+            raise HTTPException(status_code=404, detail="Restaurant not found")
+        return {
+            "id": restaurant.id,
+            "email": restaurant.email,
+            "first_name": restaurant.name,
+            "name": restaurant.name,
+            "role": "restaurant",
+            "user_type": user_type,
+        }
+
+    if user_type == "delivery_agent":
+        agent = db.query(DeliveryAgent).filter(DeliveryAgent.agent_id == str(user_id)).first()
+        if not agent:
+            raise HTTPException(status_code=404, detail="Delivery agent not found")
+        return {
+            "id": agent.agent_id,
+            "email": agent.email,
+            "first_name": agent.full_name,
+            "name": agent.full_name,
+            "role": "agent",
+            "user_type": user_type,
+        }
+
+    raise HTTPException(status_code=401, detail="Unsupported user type")
 
 
 @router.post("/", response_model=UserOut, status_code=status.HTTP_201_CREATED)

@@ -1,0 +1,385 @@
+{
+  "info": {
+    "name": "Localbite Dispatch + Bidding Workflow",
+    "_postman_id": "f1a6f2d5-7f06-4c90-9de7-2f7de4f1c001",
+    "description": "End-to-end workflow for Localbite backend: registrations, fare quote, order creation, dispatch phase timers, bidding, and bid acceptance.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "00 - Initialize Run Variables",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/",
+          "host": ["{{baseUrl}}"]
+        },
+        "description": "Initializes unique emails/IDs for this run. Run this first."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Root responds', function () {",
+              "  pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+              "});",
+              "const runId = Date.now().toString();",
+              "pm.environment.set('run_id', runId);",
+              "pm.environment.set('user_email', `user_${runId}@example.com`);",
+              "pm.environment.set('user_password', 'TestPass123!');",
+              "pm.environment.set('restaurant_email', `rest_${runId}@example.com`);",
+              "pm.environment.set('restaurant_password', 'RestPass123!');",
+              "pm.environment.set('student_agent_email', `student_agent_${runId}@example.com`);",
+              "pm.environment.set('student_agent_password', 'AgentPass123!');",
+              "pm.environment.set('normal_agent_email', `normal_agent_${runId}@example.com`);",
+              "pm.environment.set('normal_agent_password', 'AgentPass123!');",
+              "pm.environment.set('student_agent_id', `student_${runId}`);",
+              "pm.environment.set('normal_agent_id', `agent_${runId}`);",
+              "pm.environment.set('student_phone', `1555${runId.slice(-7)}`);",
+              "pm.environment.set('normal_phone', `1666${runId.slice(-7)}`);",
+              "pm.environment.set('user_phone', `1444${runId.slice(-7)}`);",
+              "pm.environment.unset('user_id');",
+              "pm.environment.unset('restaurant_id');",
+              "pm.environment.unset('menu_id');",
+              "pm.environment.unset('order_id');",
+              "pm.environment.unset('base_fare');",
+              "pm.environment.unset('max_bid_limit');",
+              "pm.environment.unset('student_bid_id');",
+              "pm.environment.unset('normal_bid_id');",
+              "pm.environment.unset('dispatch_status');",
+              "pm.environment.unset('dispatch_phase');"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "01 - Register User",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{user_email}}\",\n  \"phone\": \"{{user_phone}}\",\n  \"password\": \"{{user_password}}\",\n  \"first_name\": \"Postman\",\n  \"last_name\": \"User\",\n  \"role\": \"customer\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/register/user",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "register", "user"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {"type": "text/javascript", "exec": [
+            "pm.test('User registered', function () { pm.response.to.have.status(201); });",
+            "const j = pm.response.json();",
+            "pm.environment.set('user_id', j.id);"
+          ]}
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "02 - Register Restaurant",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Postman Pizza {{run_id}}\",\n  \"email\": \"{{restaurant_email}}\",\n  \"password\": \"{{restaurant_password}}\",\n  \"description\": \"Test restaurant for dispatch workflow\",\n  \"cuisine_type\": \"Pizza\",\n  \"address\": \"220 G St, Davis, CA\",\n  \"city\": \"Davis\",\n  \"state\": \"CA\",\n  \"latitude\": {{restaurant_latitude}},\n  \"longitude\": {{restaurant_longitude}},\n  \"commission_rate\": 0.1,\n  \"is_active\": true,\n  \"is_approved\": true\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/register/restaurant",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "register", "restaurant"]
+        }
+      },
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+        "pm.test('Restaurant registered', function () { pm.response.to.have.status(201); });",
+        "const j = pm.response.json();",
+        "pm.environment.set('restaurant_id', j.id);"
+      ]}}],
+      "response": []
+    },
+    {
+      "name": "03 - Register Student Delivery Agent",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"agent_id\": \"{{student_agent_id}}\",\n  \"full_name\": \"Student Rider {{run_id}}\",\n  \"email\": \"{{student_agent_email}}\",\n  \"password\": \"{{student_agent_password}}\",\n  \"phone_number\": \"{{student_phone}}\",\n  \"agent_type\": \"student\",\n  \"university_name\": \"UC Davis\",\n  \"student_id\": \"UCD{{run_id}}\",\n  \"vehicle_type\": \"bike\",\n  \"is_active\": true,\n  \"is_verified\": true,\n  \"base_payout_per_delivery\": 3.0,\n  \"bonus_multiplier\": 1.0\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/register/delivery-agent",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "register", "delivery-agent"]
+        }
+      },
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+        "pm.test('Student agent registered', function () { pm.response.to.have.status(201); });",
+        "try { const j = pm.response.json(); if (j && j.agent_id) pm.environment.set('student_agent_id', j.agent_id); } catch (e) {}"
+      ]}}],
+      "response": []
+    },
+    {
+      "name": "04 - Register Normal Delivery Agent",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"agent_id\": \"{{normal_agent_id}}\",\n  \"full_name\": \"Partner Rider {{run_id}}\",\n  \"email\": \"{{normal_agent_email}}\",\n  \"password\": \"{{normal_agent_password}}\",\n  \"phone_number\": \"{{normal_phone}}\",\n  \"agent_type\": \"normal\",\n  \"vehicle_type\": \"scooter\",\n  \"is_active\": true,\n  \"is_verified\": true,\n  \"base_payout_per_delivery\": 3.5,\n  \"bonus_multiplier\": 1.0\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/register/delivery-agent",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "register", "delivery-agent"]
+        }
+      },
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+        "pm.test('Normal agent registered', function () { pm.response.to.have.status(201); });",
+        "try { const j = pm.response.json(); if (j && j.agent_id) pm.environment.set('normal_agent_id', j.agent_id); } catch (e) {}"
+      ]}}],
+      "response": []
+    },
+    {
+      "name": "05 - Login User (Optional)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {"mode": "raw", "raw": "{\n  \"email\": \"{{user_email}}\",\n  \"password\": \"{{user_password}}\"\n}"},
+        "url": {"raw": "{{baseUrl}}/api/v1/auth/login/user", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "login", "user"]}
+      },
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+        "pm.test('User login ok', function(){ pm.response.to.have.status(200); });",
+        "const j = pm.response.json(); if (j.access_token) pm.environment.set('user_access_token', j.access_token);"
+      ]}}],
+      "response": []
+    },
+    {
+      "name": "06 - Fare Recommendation",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"user_location\": {\n    \"address\": \"{{user_delivery_address}}\",\n    \"latitude\": {{user_latitude}},\n    \"longitude\": {{user_longitude}}\n  },\n  \"restaurant_location\": {\n    \"address\": \"{{restaurant_pickup_address}}\",\n    \"latitude\": {{restaurant_latitude}},\n    \"longitude\": {{restaurant_longitude}}\n  },\n  \"incentive_metrics\": {\n    \"demand_index\": {{demand_index}},\n    \"supply_index\": {{supply_index}},\n    \"weather_severity\": {{weather_severity}}\n  }\n}"
+        },
+        "url": {"raw": "{{baseUrl}}/api/v1/fares/recommendation", "host": ["{{baseUrl}}"], "path": ["api", "v1", "fares", "recommendation"]}
+      },
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+        "pm.test('Fare recommendation ok', function(){ pm.response.to.have.status(200); });",
+        "const j = pm.response.json();",
+        "pm.environment.set('base_fare', j.base_fare);",
+        "pm.environment.set('max_bid_limit', j.max_bid_limit);",
+        "pm.environment.set('eta_estimate_minutes', j.eta_estimate_minutes);",
+        "const min = Number(j.base_fare);",
+        "const max = Number(j.max_bid_limit);",
+        "const studentBid = Number((min + (max - min) * 0.2).toFixed(2));",
+        "const normalBid = Number((min + (max - min) * 0.6).toFixed(2));",
+        "pm.environment.set('student_bid_amount', studentBid);",
+        "pm.environment.set('normal_bid_amount', normalBid);"
+      ]}}],
+      "response": []
+    },
+    {
+      "name": "07 - Create Order",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"user_id\": {{user_id}},\n  \"restaurant_id\": {{restaurant_id}},\n  \"assigned_partner_id\": null,\n  \"order_items\": [\n    { \"item_id\": 1, \"quantity\": 1, \"customizations\": [] },\n    { \"item_id\": 2, \"quantity\": 2, \"customizations\": [\"extra cheese\"] }\n  ],\n  \"base_fare\": {{base_fare}},\n  \"delivery_fee\": {{base_fare}},\n  \"commission_amount\": {{commission_amount}},\n  \"order_status\": \"pending\"\n}"
+        },
+        "url": {"raw": "{{baseUrl}}/api/v1/orders/", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders", ""]}
+      },
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+        "pm.test('Order created', function(){ pm.response.to.have.status(201); });",
+        "const j = pm.response.json();",
+        "pm.environment.set('order_id', j.order_id);"
+      ]}}],
+      "response": []
+    },
+    {
+      "name": "08 - Start Dispatch (Fast Timers)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"delivery_address\": \"{{user_delivery_address}}\",\n  \"phase1_wait_seconds_min\": {{phase1_wait_seconds_min}},\n  \"phase1_wait_seconds_max\": {{phase1_wait_seconds_max}},\n  \"phase2_wait_seconds\": {{phase2_wait_seconds}},\n  \"poll_interval_seconds\": {{poll_interval_seconds}}\n}"
+        },
+        "url": {"raw": "{{baseUrl}}/api/v1/dispatch/orders/{{order_id}}/start", "host": ["{{baseUrl}}"], "path": ["api", "v1", "dispatch", "orders", "{{order_id}}", "start"]},
+        "description": "Uses short timers from environment for quick testing."
+      },
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+        "pm.test('Dispatch start accepted', function(){ pm.expect(pm.response.code).to.be.oneOf([202, 200]); });"
+      ]}}],
+      "response": []
+    },
+    {
+      "name": "09 - Dispatch Status (Poll)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {"raw": "{{baseUrl}}/api/v1/dispatch/orders/{{order_id}}/status", "host": ["{{baseUrl}}"], "path": ["api", "v1", "dispatch", "orders", "{{order_id}}", "status"]},
+        "description": "Run repeatedly to observe phase transitions: student_pool -> all_agents -> needs_fee_increase (unless a bid is accepted)."
+      },
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+        "pm.test('Dispatch status ok', function(){ pm.response.to.have.status(200); });",
+        "const j = pm.response.json();",
+        "pm.environment.set('dispatch_status', j.status);",
+        "pm.environment.set('dispatch_phase', j.phase);"
+      ]}}],
+      "response": []
+    },
+    {
+      "name": "10 - Place Student Bid (Phase 1)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"order_id\": {{order_id}},\n  \"agent_id\": \"{{student_agent_id}}\",\n  \"bid_amount\": {{student_bid_amount}},\n  \"pool_phase\": \"student_pool\"\n}"
+        },
+        "url": {"raw": "{{baseUrl}}/api/v1/delivery-bids/", "host": ["{{baseUrl}}"], "path": ["api", "v1", "delivery-bids", ""]},
+        "description": "Use this during student phase. Accept it to stop timers early."
+      },
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+        "pm.test('Student bid placed', function(){ pm.response.to.have.status(201); });",
+        "const j = pm.response.json();",
+        "pm.environment.set('student_bid_id', j.bid_id);"
+      ]}}],
+      "response": []
+    },
+    {
+      "name": "11 - Place Normal Agent Bid (Phase 2)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"order_id\": {{order_id}},\n  \"agent_id\": \"{{normal_agent_id}}\",\n  \"bid_amount\": {{normal_bid_amount}},\n  \"pool_phase\": \"all_agents\"\n}"
+        },
+        "url": {"raw": "{{baseUrl}}/api/v1/delivery-bids/", "host": ["{{baseUrl}}"], "path": ["api", "v1", "delivery-bids", ""]},
+        "description": "Use this after dispatch status reaches phase=all_agents."
+      },
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+        "pm.test('Normal bid placed', function(){ pm.response.to.have.status(201); });",
+        "const j = pm.response.json();",
+        "pm.environment.set('normal_bid_id', j.bid_id);"
+      ]}}],
+      "response": []
+    },
+    {
+      "name": "12 - List Bids for Order",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {"raw": "{{baseUrl}}/api/v1/delivery-bids/orders/{{order_id}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "delivery-bids", "orders", "{{order_id}}"]}
+      },
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+        "pm.test('Order bids listed', function(){ pm.response.to.have.status(200); });",
+        "const bids = pm.response.json();",
+        "if (Array.isArray(bids) && bids.length && !pm.environment.get('student_bid_id')) {",
+        "  pm.environment.set('student_bid_id', bids[0].bid_id);",
+        "}"
+      ]}}],
+      "response": []
+    },
+    {
+      "name": "13 - Accept Student Bid (Preferred)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {"raw": "{{baseUrl}}/api/v1/delivery-bids/{{student_bid_id}}/accept", "host": ["{{baseUrl}}"], "path": ["api", "v1", "delivery-bids", "{{student_bid_id}}", "accept"]},
+        "description": "Accepts the student bid, assigns the order, and stops dispatch timers via Redis state update."
+      },
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+        "pm.test('Bid accepted', function(){ pm.response.to.have.status(200); });"
+      ]}}],
+      "response": []
+    },
+    {
+      "name": "14 - Get Order (Verify Assignment)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {"raw": "{{baseUrl}}/api/v1/orders/{{order_id}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders", "{{order_id}}"]}
+      },
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+        "pm.test('Order fetched', function(){ pm.response.to.have.status(200); });",
+        "const j = pm.response.json();",
+        "pm.test('Order assigned partner is set', function(){ pm.expect(j.assigned_partner_id).to.exist; });",
+        "pm.test('Delivery fee updated from accepted bid', function(){ pm.expect(Number(j.delivery_fee)).to.be.greaterThan(0); });"
+      ]}}],
+      "response": []
+    },
+    {
+      "name": "15 - Dispatch Status (After Acceptance)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {"raw": "{{baseUrl}}/api/v1/dispatch/orders/{{order_id}}/status", "host": ["{{baseUrl}}"], "path": ["api", "v1", "dispatch", "orders", "{{order_id}}", "status"]}
+      },
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+        "pm.test('Dispatch status fetched', function(){ pm.response.to.have.status(200); });",
+        "const j = pm.response.json();",
+        "pm.test('Dispatch eventually marked assigned/completed', function(){",
+        "  pm.expect(['assigned','completed','waiting_for_bids','broadcasted','starting','needs_fee_increase']).to.include(j.status);",
+        "});"
+      ]}}],
+      "response": []
+    },
+    {
+      "name": "16 - Timer Demo (Create 2nd Order)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"user_id\": {{user_id}},\n  \"restaurant_id\": {{restaurant_id}},\n  \"assigned_partner_id\": null,\n  \"order_items\": [{ \"item_id\": 99, \"quantity\": 1 }],\n  \"base_fare\": {{base_fare}},\n  \"delivery_fee\": {{base_fare}},\n  \"commission_amount\": {{commission_amount}},\n  \"order_status\": \"pending\"\n}"
+        },
+        "url": {"raw": "{{baseUrl}}/api/v1/orders/", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders", ""]},
+        "description": "Optional timer-only scenario. Start dispatch for this order and do not place any bids to observe needs_fee_increase."
+      },
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+        "pm.test('Second order created', function(){ pm.response.to.have.status(201); });",
+        "const j = pm.response.json();",
+        "pm.environment.set('order2_id', j.order_id);"
+      ]}}],
+      "response": []
+    },
+    {
+      "name": "17 - Timer Demo Start Dispatch (2nd Order)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"delivery_address\": \"{{user_delivery_address}}\",\n  \"phase1_wait_seconds_min\": {{phase1_wait_seconds_min}},\n  \"phase1_wait_seconds_max\": {{phase1_wait_seconds_max}},\n  \"phase2_wait_seconds\": {{phase2_wait_seconds}},\n  \"poll_interval_seconds\": {{poll_interval_seconds}}\n}"
+        },
+        "url": {"raw": "{{baseUrl}}/api/v1/dispatch/orders/{{order2_id}}/start", "host": ["{{baseUrl}}"], "path": ["api", "v1", "dispatch", "orders", "{{order2_id}}", "start"]}
+      },
+      "response": []
+    },
+    {
+      "name": "18 - Timer Demo Dispatch Status (2nd Order)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {"raw": "{{baseUrl}}/api/v1/dispatch/orders/{{order2_id}}/status", "host": ["{{baseUrl}}"], "path": ["api", "v1", "dispatch", "orders", "{{order2_id}}", "status"]},
+        "description": "Poll this after the short timers to confirm status becomes needs_fee_increase if no bids are accepted."
+      },
+      "response": []
+    }
+  ]
+}

@@ -26,7 +26,11 @@ class DeliveryAgent(Base):
     phone_number = Column(String, unique=True, nullable=False)
 
     agent_type = Column(
-        Enum(AgentType, name="agent_type_enum"),
+        Enum(
+            AgentType,
+            name="agent_type_enum",
+            validate_strings=True,
+        ),
         nullable=False,
         default=AgentType.THIRD_PARTY,
     )
@@ -34,7 +38,11 @@ class DeliveryAgent(Base):
     student_id = Column(String, nullable=True)
 
     vehicle_type = Column(
-        Enum(VehicleType, name="vehicle_type_enum"),
+        Enum(
+            VehicleType,
+            name="vehicle_type_enum",
+            validate_strings=True,
+        ),
         nullable=False,
     )
     is_active = Column(Boolean, default=True)
@@ -48,6 +56,7 @@ class DeliveryAgent(Base):
 
     rating = Column(Float, default=5.0)
     total_deliveries = Column(Integer, default=0)
+    total_earnings = Column(Float, default=0.0)
 
     current_lat = Column(Float, nullable=True)
     current_lng = Column(Float, nullable=True)

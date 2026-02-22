@@ -58,5 +58,6 @@ class FareBreakdown(BaseModel):
 
 class FareRecommendationResponse(BaseModel):
     base_fare: float = Field(..., description="Bidding minimum for delivery agents.")
+    max_bid_limit: float = Field(..., description="Maximum allowed bid (1.5x base fare).")
     eta_estimate_minutes: int
     breakdown: FareBreakdown

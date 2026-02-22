@@ -5,3 +5,4 @@ from .users import User
 from .payments import Payment
 from .menu import MenuItem
 from .order import Order
+from .delivery_bid import DeliveryBid

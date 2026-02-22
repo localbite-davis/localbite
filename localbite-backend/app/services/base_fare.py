@@ -8,6 +8,7 @@ BASE_PICKUP_FEE = 2.25
 PER_KM_RATE = 0.95
 MIN_BASE_FARE = 3.25
 MAX_BASE_FARE = 35.00
+MAX_BID_MULTIPLIER = 1.5
 
 
 def get_fare_recommendation(payload: FareRecommendationRequest) -> FareRecommendationResponse:
@@ -28,6 +29,7 @@ def get_fare_recommendation(payload: FareRecommendationRequest) -> FareRecommend
     raw_fare *= peak_multiplier * incentive_multiplier
 
     base_fare = round(_clamp(raw_fare, MIN_BASE_FARE, MAX_BASE_FARE), 2)
+    max_bid_limit = get_max_bid_limit(base_fare)
     eta_minutes = _estimate_eta_minutes(
         distance_km=distance_km,
         peak_multiplier=peak_multiplier,
@@ -36,6 +38,7 @@ def get_fare_recommendation(payload: FareRecommendationRequest) -> FareRecommend
 
     return FareRecommendationResponse(
         base_fare=base_fare,
+        max_bid_limit=max_bid_limit,
         eta_estimate_minutes=eta_minutes,
         breakdown=FareBreakdown(
             distance_km=round(distance_km, 2),
@@ -93,6 +96,15 @@ def _estimate_eta_minutes(
     dispatch_buffer = 8
     eta = math.ceil(travel_minutes + dispatch_buffer)
     return max(10, eta)
+
+
+def get_max_bid_limit(base_fare: float) -> float:
+    return round(base_fare * MAX_BID_MULTIPLIER, 2)
+
+
+def get_bid_window(base_fare: float) -> tuple[float, float]:
+    base = round(max(base_fare, 0.0), 2)
+    return base, get_max_bid_limit(base)
 
 
 def _clamp(value: float, minimum: float, maximum: float) -> float:

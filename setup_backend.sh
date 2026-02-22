@@ -1,29 +1,42 @@
 #!/bin/bash
 
-# Exit immediately if a command exits with a non-zero status
 set -e
 
-echo "Setting up Backend Environment..."
+echo "Setting up Backend Environment (pyenv + pyenv-virtualenv)..."
 
-# Navigate to backend directory
 cd localbite-backend
 
-# Check if python3 is available
-if ! command -v python3 &> /dev/null; then
-    echo "python3 could not be found. Please install Python 3."
+# Ensure pyenv exists
+if ! command -v pyenv &> /dev/null; then
+    echo "pyenv not found. Please install pyenv first."
     exit 1
 fi
 
-# Create virtual environment if it doesn't exist
-if [ ! -d "venv" ]; then
-    echo "Creating virtual environment..."
-    python3 -m venv venv
+# Desired Python version & virtualenv name
+PYTHON_VERSION="3.13"
+VENV_NAME="localbite-backend"
+
+# Install Python version if missing
+# if pyenv versions --bare | grep -qx "${PYTHON_VERSION}"; then
+#     echo "Python ${PYTHON_VERSION} already installed."
+# else
+#     echo "Installing Python ${PYTHON_VERSION}..."
+#     pyenv install ${PYTHON_VERSION}
+# fi
+
+# Create virtualenv if missing
+if pyenv virtualenvs --bare | grep -qx "${VENV_NAME}"; then
+    echo "Virtualenv '${VENV_NAME}' already exists."
 else
-    echo "Virtual environment already exists."
+    echo "Creating virtualenv '${VENV_NAME}'..."
+    pyenv virtualenv ${PYTHON_VERSION} ${VENV_NAME}
 fi
 
-# Activate virtual environment
-source venv/bin/activate
+# Activate via local version
+pyenv local ${VENV_NAME}
+
+# Refresh shims
+pyenv rehash
 
 # Upgrade pip
 echo "Upgrading pip..."
@@ -33,7 +46,7 @@ pip install --upgrade pip
 echo "Installing Python modules..."
 pip install fastapi "uvicorn[standard]" python-dotenv
 
-# Freeze dependencies to requirements.txt
+# Freeze dependencies
 pip freeze > requirements.txt
 echo "Dependencies saved to requirements.txt"
 

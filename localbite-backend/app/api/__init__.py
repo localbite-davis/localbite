@@ -8,6 +8,8 @@ from .register import router as register_router
 from .menu import router as menu_router
 from .orders import router as orders_router
 from .fares import router as fares_router
+from .delivery_bids import router as delivery_bids_router
+from .dispatch import router as dispatch_router
 
 api_router = APIRouter()
 api_router.include_router(auth_router)
@@ -19,5 +21,7 @@ api_router.include_router(payments_router)
 api_router.include_router(menu_router)
 api_router.include_router(orders_router)
 api_router.include_router(fares_router)
+api_router.include_router(delivery_bids_router)
+api_router.include_router(dispatch_router)
 
 __all__ = ["api_router"]

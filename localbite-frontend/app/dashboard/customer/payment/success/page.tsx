@@ -1,8 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/context/auth-context"
+import { startOrderDispatch } from "@/lib/api/dispatch"
 import { CheckCircle2, Loader2, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -11,41 +12,87 @@ const API_URL = "http://localhost:8000/api/v1"
 export default function PaymentSuccessPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { isAuthenticated, user } = useAuth()
+  const { isAuthenticated, isAuthLoading, user } = useAuth()
   const [status, setStatus] = useState<"loading" | "success" | "error">(
     "loading"
   )
   const [error, setError] = useState<string | null>(null)
+  const dispatchStartedRef = useRef(false)
 
   const sessionId = searchParams.get("session_id")
+  const orderIdFromQuery = searchParams.get("order_id") || searchParams.get("orderId")
 
   useEffect(() => {
-    // Check if user is authenticated
     const checkAndRedirect = async () => {
-      // If user is authenticated, proceed
-      if (isAuthenticated && user) {
-        setStatus("success")
-        
-        // Redirect immediately to cart (no delay)
-        router.push("/dashboard/customer/cart")
+      if (isAuthLoading) {
         return
       }
-      
-      // If not authenticated, redirect to login
+
+      if (isAuthenticated && user) {
+        if (!dispatchStartedRef.current) {
+          dispatchStartedRef.current = true
+          try {
+            const rawContext =
+              typeof window !== "undefined"
+                ? window.sessionStorage.getItem("pending_dispatch_context")
+                : null
+
+            const parsed = rawContext
+              ? (JSON.parse(rawContext) as {
+                  orderId?: string
+                  deliveryAddress?: string
+                })
+              : undefined
+
+            const parsedOrderId = Number(parsed?.orderId || orderIdFromQuery)
+            if (!Number.isFinite(parsedOrderId) || parsedOrderId <= 0) {
+              throw new Error(
+                "Payment succeeded but order ID was missing, so dispatch could not be started"
+              )
+            }
+
+            await startOrderDispatch(parsedOrderId, {
+              delivery_address:
+                parsed?.deliveryAddress || "Segundo Dining Commons, Davis, CA",
+              phase1_wait_seconds_min: 180,
+              phase1_wait_seconds_max: 180,
+              phase2_wait_seconds: 180,
+              poll_interval_seconds: 5,
+            })
+          } catch (err) {
+            console.error("Dispatch start failed:", err)
+            setError(
+              err instanceof Error
+                ? err.message
+                : "Payment succeeded, but dispatch failed to start"
+            )
+            setStatus("error")
+            return
+          } finally {
+            if (typeof window !== "undefined") {
+              window.sessionStorage.removeItem("pending_dispatch_context")
+            }
+          }
+        }
+
+        setStatus("success")
+        router.push("/dashboard/customer/orders")
+        return
+      }
+
       if (!isAuthenticated) {
         router.replace("/login")
         return
       }
-      
-      // Otherwise wait for auth to initialize
+
       setStatus("success")
       setTimeout(() => {
-        router.push("/dashboard/customer/cart")
+        router.push("/dashboard/customer/orders")
       }, 1000)
     }
 
     checkAndRedirect()
-  }, [isAuthenticated, user, router])
+  }, [isAuthenticated, isAuthLoading, user, router, orderIdFromQuery])
 
   if (status === "loading") {
     return (
@@ -93,16 +140,16 @@ export default function PaymentSuccessPage() {
           Payment Successful!
         </h2>
         <p className="text-muted-foreground">
-          Your order has been confirmed and is now being prepared
+          Your order has been confirmed and dispatch is starting
         </p>
         <p className="text-sm text-muted-foreground">
-          Redirecting to your cart...
+          Redirecting to your orders...
         </p>
         <Button
-          onClick={() => router.push("/dashboard/customer/cart")}
+          onClick={() => router.push("/dashboard/customer/orders")}
           className="w-full rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
         >
-          Return to Cart
+          View Orders
         </Button>
       </div>
     </div>

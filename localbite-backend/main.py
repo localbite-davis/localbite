@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.exc import OperationalError
 from app.api import api_router
 from app.database import engine, Base
-from app.models import Restaurant, User, DeliveryAgent, Payment, MenuItem, Order
+from app.models import Restaurant, User, DeliveryAgent, Payment, MenuItem, Order, DeliveryBid
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -13,10 +13,11 @@ async def lifespan(app: FastAPI):
         Base.metadata.create_all(bind=engine)
         # Ensure any new nullable columns exist (useful during development/hackathons
         # when the DB schema may lag behind model changes). This is idempotent.
-        from app.database import ensure_delivery_agent_columns
+        from app.database import ensure_delivery_agent_columns, ensure_order_delivery_columns
 
         try:
             ensure_delivery_agent_columns()
+            ensure_order_delivery_columns()
         except Exception as e:
             # Don't fail startup for this helper, just log the error.
             print(f"Warning: ensure_delivery_agent_columns failed: {e}")

@@ -14,6 +14,14 @@ from .fare import (
     FareBreakdown,
     FareRecommendationResponse,
 )
+from .delivery_bid import DeliveryBidCreate, DeliveryBidUpdate, DeliveryBidOut, DeliveryBidListItem
+from .dispatch import (
+    DispatchStartRequest,
+    DispatchStartResponse,
+    DispatchStatusResponse,
+    AgentAvailableDispatchItem,
+    AgentAvailableDispatchResponse,
+)
 
 __all__ = [
     "RestaurantBase",
@@ -37,4 +45,13 @@ __all__ = [
     "FareRecommendationRequest",
     "FareBreakdown",
     "FareRecommendationResponse",
+    "DeliveryBidCreate",
+    "DeliveryBidUpdate",
+    "DeliveryBidOut",
+    "DeliveryBidListItem",
+    "DispatchStartRequest",
+    "DispatchStartResponse",
+    "DispatchStatusResponse",
+    "AgentAvailableDispatchItem",
+    "AgentAvailableDispatchResponse",
 ]
