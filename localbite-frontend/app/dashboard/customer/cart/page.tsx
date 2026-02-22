@@ -1,7 +1,12 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { useCart } from "@/app/dashboard/customer/layout"
+import { useAuth } from "@/context/auth-context"
+import { placeOrder } from "@/lib/api/orders"
+import { getDatabaseMenuItemId } from "@/lib/menu-id-map"
 import {
   Minus,
   Plus,
@@ -9,15 +14,61 @@ import {
   ArrowLeft,
   ShoppingCart,
   UtensilsCrossed,
+  Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 
 export default function CartPage() {
   const { items, removeItem, updateQuantity, clearCart, total } = useCart()
+  const { user } = useAuth()
+  const router = useRouter()
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
   const deliveryFee = items.length > 0 ? 2.49 : 0
   const serviceFee = items.length > 0 ? 1.99 : 0
+  const commission = total * 0.1
   const grandTotal = total + deliveryFee + serviceFee
+
+  const handlePlaceOrder = async () => {
+    if (!user || !items.length) return
+
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const restaurantId = parseInt(items[0].restaurantId)
+      const userId = user.id || 1
+
+      const orderItems = items.map((item) => ({
+        item_id: getDatabaseMenuItemId(item.id),
+        quantity: item.quantity,
+        customizations: {},
+      }))
+
+      const orderPayload = {
+        user_id: userId,
+        restaurant_id: restaurantId,
+        order_items: orderItems,
+        base_fare: 5.0,
+        delivery_fee: deliveryFee,
+        commission_amount: commission,
+        order_status: "pending",
+      }
+
+      await placeOrder(orderPayload)
+      clearCart()
+      router.push("/dashboard/customer/orders")
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to place order"
+      setError(errorMessage)
+      console.error("Order placement error:", err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   if (items.length === 0) {
     return (
@@ -144,9 +195,21 @@ export default function CartPage() {
               <span>${grandTotal.toFixed(2)}</span>
             </div>
           </div>
-          <Button className="mt-6 w-full rounded-xl bg-primary text-primary-foreground hover:bg-primary/90">
-            Place Order
+          <Button className="mt-6 w-full rounded-xl bg-primary text-primary-foreground hover:bg-primary/90" onClick={handlePlaceOrder} disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Placing Order...
+              </>
+            ) : (
+              "Place Order"
+            )}
           </Button>
+          {error && (
+            <div className="mt-3 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+              {error}
+            </div>
+          )}
           <Link href="/dashboard/customer">
             <Button
               variant="ghost"

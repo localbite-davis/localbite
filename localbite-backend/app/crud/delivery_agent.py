@@ -16,6 +16,8 @@ def create(db: Session, payload: DeliveryAgentCreate) -> DeliveryAgent:
         agent_type=payload.agent_type,
         university_name=payload.university_name,
         student_id=payload.student_id,
+        kerberos_id=getattr(payload, "kerberos_id", None),
+        background_check_status=getattr(payload, "background_check_status", None),
         vehicle_type=payload.vehicle_type,
         is_active=payload.is_active,
         is_verified=payload.is_verified,
