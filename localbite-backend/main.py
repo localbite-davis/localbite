@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from sqlalchemy.exc import OperationalError
+from app.api import api_router
 from app.database import engine, Base
 from app.models import Restaurant, User, DeliveryAgent, Payment
 
@@ -17,6 +18,7 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(lifespan=lifespan)
+app.include_router(api_router, prefix="/api/v1")
 
 @app.get("/")
 def read_root():

@@ -1,55 +1,52 @@
-from enum import Enum
-from typing import Optional
-from pydantic import BaseModel, Field, EmailStr, model_validator
+from enum import Enum as PyEnum
+from sqlalchemy import Boolean, Column, DateTime, Enum, Float, Integer, String
+from sqlalchemy.sql import func
+from app.database import Base
 
 
-class AgentType(str, Enum):
+class AgentType(str, PyEnum):
     STUDENT = "student"
     NORMAL = "normal"
 
 
-class VehicleType(str, Enum):
+class VehicleType(str, PyEnum):
     BIKE = "bike"
     SCOOTER = "scooter"
     CAR = "car"
     WALK = "walk"
 
 
-class DeliveryAgent(BaseModel):
-    """Defines the data model for a DeliveryAgent"""
+class DeliveryAgent(Base):
+    __tablename__ = "delivery_agents"
 
-    # Identity
-    agent_id: str = Field(..., description="Unique identifier for the delivery agent")
-    full_name: str
-    email: Optional[EmailStr] = None
-    phone_number: str
-    # Classification
-    agent_type: AgentType
-    # Student-specific fields
-    university_name: Optional[str] = None
-    student_id: Optional[str] = None
-    # Operational details
-    vehicle_type: VehicleType
-    is_active: bool = Field(default=True, description="Whether agent is currently active")
-    is_verified: bool = Field(default=False, description="KYC / background verification status")
-    # Ratings & metrics
-    rating: float = Field(default=5.0, ge=1.0, le=5.0)
-    total_deliveries: int = Field(default=0, ge=0)
-    # Availability & location
-    current_lat: Optional[float] = None
-    current_lng: Optional[float] = None
-    # Financials
-    base_payout_per_delivery: float = Field(..., ge=0)
-    bonus_multiplier: float = Field(default=1.0, ge=0)
-    # Metadata
-    created_at: Optional[int] = Field(
-        default=None,
-        description="Unix timestamp of agent creation"
+    agent_id = Column(String, primary_key=True, index=True)
+    full_name = Column(String, nullable=False)
+    email = Column(String, unique=True, nullable=True, index=True)
+    phone_number = Column(String, unique=True, nullable=False)
+
+    agent_type = Column(
+        Enum(AgentType, name="agent_type_enum"),
+        nullable=False,
+        default=AgentType.NORMAL,
     )
+    university_name = Column(String, nullable=True)
+    student_id = Column(String, nullable=True)
 
-    @model_validator(mode="after")
-    def validate_student_fields(self):
-        if self.agent_type == AgentType.STUDENT:
-            if not self.university_name or not self.student_id:
-                raise ValueError("Student agents must have university_name and student_id")
-        return self
+    vehicle_type = Column(
+        Enum(VehicleType, name="vehicle_type_enum"),
+        nullable=False,
+    )
+    is_active = Column(Boolean, default=True)
+    is_verified = Column(Boolean, default=False)
+
+    rating = Column(Float, default=5.0)
+    total_deliveries = Column(Integer, default=0)
+
+    current_lat = Column(Float, nullable=True)
+    current_lng = Column(Float, nullable=True)
+
+    base_payout_per_delivery = Column(Float, nullable=False)
+    bonus_multiplier = Column(Float, default=1.0)
+
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

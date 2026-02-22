@@ -1,11 +1,12 @@
-from enum import Enum
-from typing import Optional, Dict, Any
-from pydantic import BaseModel, Field
-from uuid import UUID
-from datetime import datetime
+import uuid
+from enum import Enum as PyEnum
+from sqlalchemy import Column, DateTime, Enum, Integer, JSON, String
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.sql import func
+from app.database import Base
 
 
-class PaymentStatus(str, Enum):
+class PaymentStatus(str, PyEnum):
     CREATED = "created"
     AUTHORIZED = "authorized"
     CAPTURED = "captured"
@@ -15,90 +16,62 @@ class PaymentStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class PaymentMethodType(str, Enum):
+class PaymentMethodType(str, PyEnum):
     CARD = "card"
     APPLE_PAY = "apple_pay"
     GOOGLE_PAY = "google_pay"
     CASH = "cash"
 
 
-class PaymentProvider(str, Enum):
+class PaymentProvider(str, PyEnum):
     STRIPE = "stripe"
     CASH = "cash"
     INTERNAL = "internal"
 
 
+class Payment(Base):
+    __tablename__ = "payments"
 
-class Payment(BaseModel):
-    """
-    Represents a single immutable payment transaction.
-    Designed for US-based (California) card-first payments.
-    """
+    payment_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    order_id = Column(UUID(as_uuid=True), nullable=False, index=True)
 
-    # Identifiers
-    payment_id: UUID = Field(..., description="Internal payment UUID")
-    order_id: UUID = Field(..., description="Associated order UUID")
+    customer_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+    merchant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
 
-    customer_id: Optional[UUID] = Field(
-        None, description="Customer placing the order"
+    provider = Column(
+        Enum(PaymentProvider, name="payment_provider_enum"),
+        nullable=False,
+        default=PaymentProvider.STRIPE,
     )
-    merchant_id: UUID = Field(
-        ..., description="Restaurant receiving the payment"
-    )
+    provider_payment_intent_id = Column(String, nullable=True, index=True)
+    provider_charge_id = Column(String, nullable=True, index=True)
+    provider_metadata = Column(JSON, nullable=True)
 
-    # Provider details
-    provider: PaymentProvider = PaymentProvider.STRIPE
-    provider_payment_intent_id: Optional[str] = Field(
-        None, description="Stripe PaymentIntent ID"
-    )
-    provider_charge_id: Optional[str] = Field(
-        None, description="Stripe Charge ID"
-    )
-    provider_metadata: Optional[Dict[str, Any]] = Field(
-        None, description="Sanitized provider response"
-    )
+    amount_subtotal = Column(Integer, nullable=False)
+    amount_tax = Column(Integer, default=0)
+    amount_tip = Column(Integer, default=0)
+    amount_fees = Column(Integer, default=0)
+    amount_total = Column(Integer, nullable=False)
 
-    # Monetary values (USD, cents)
-    amount_subtotal: int = Field(
-        ..., gt=0, description="Subtotal in cents (before tax, fees)"
-    )
-    amount_tax: int = Field(
-        default=0, ge=0, description="Sales tax in cents (CA tax)"
-    )
-    amount_tip: int = Field(
-        default=0, ge=0, description="Tip in cents"
-    )
-    amount_fees: int = Field(
-        default=0, ge=0, description="Platform / service fees in cents"
+    currency = Column(String, default="USD", nullable=False)
+    payment_method = Column(
+        Enum(PaymentMethodType, name="payment_method_type_enum"),
+        nullable=False,
     )
 
-    amount_total: int = Field(
-        ..., gt=0, description="Final amount charged in cents"
+    status = Column(
+        Enum(PaymentStatus, name="payment_status_enum"),
+        nullable=False,
+        default=PaymentStatus.CREATED,
     )
+    failure_code = Column(String, nullable=True)
+    failure_message = Column(String, nullable=True)
 
-    currency: str = Field(default="USD", frozen=True)
+    idempotency_key = Column(String, nullable=False, unique=True, index=True)
+    refunded_amount = Column(Integer, default=0)
 
-    # Payment method
-    payment_method: PaymentMethodType
-
-    # State & failure
-    status: PaymentStatus = PaymentStatus.CREATED
-    failure_code: Optional[str] = None
-    failure_message: Optional[str] = None
-
-    # Idempotency & retries
-    idempotency_key: str = Field(
-        ..., description="Ensures payment is processed only once"
-    )
-
-    # Refund tracking
-    refunded_amount: int = Field(
-        default=0, ge=0, description="Total refunded amount in cents"
-    )
-
-    # Audit timestamps
-    created_at: datetime
-    updated_at: datetime
-    authorized_at: Optional[datetime] = None
-    captured_at: Optional[datetime] = None
-    refunded_at: Optional[datetime] = None
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    authorized_at = Column(DateTime, nullable=True)
+    captured_at = Column(DateTime, nullable=True)
+    refunded_at = Column(DateTime, nullable=True)
