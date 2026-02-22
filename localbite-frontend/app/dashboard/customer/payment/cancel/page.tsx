@@ -1,19 +1,23 @@
 "use client"
 
 import { useRouter } from "next/navigation"
+import { useEffect } from "react"
 import { useAuth } from "@/context/auth-context"
 import { XCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 export default function PaymentCancelPage() {
   const router = useRouter()
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, isAuthReady } = useAuth()
 
-  // If not authenticated, redirect to login
-  if (!isAuthenticated) {
-    router.replace("/login")
-    return null
-  }
+  useEffect(() => {
+    if (!isAuthReady) return
+    if (!isAuthenticated) {
+      router.replace("/login")
+    }
+  }, [isAuthReady, isAuthenticated, router])
+
+  if (!isAuthReady) return null
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -35,7 +39,7 @@ export default function PaymentCancelPage() {
             Try Again
           </Button>
           <Button
-            onClick={() => router.push("/dashboard/customer")}
+            onClick={() => router.push("/dashboard/customer/cart")}
             variant="outline"
             className="w-full rounded-xl"
           >

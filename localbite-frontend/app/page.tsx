@@ -1,6 +1,8 @@
 "use client"
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { useAuth } from "@/context/auth-context"
 import { useTheme } from "next-themes"
 import {
   UtensilsCrossed,
@@ -20,6 +22,25 @@ import { Button } from "@/components/ui/button"
 
 export default function LandingPage() {
   const { theme, setTheme } = useTheme()
+  const router = useRouter()
+  const { user, isAuthenticated } = useAuth()
+
+  const goToCustomer = (signupHref = "/signup?role=customer") => {
+    if (isAuthenticated && user?.role === "customer") return router.push("/dashboard/customer")
+    if (isAuthenticated && user?.role) return router.push(`/dashboard/${user.role}`)
+    return router.push(signupHref)
+  }
+
+  const goToAgent = (signupHref = "/signup?role=agent") => {
+    if (isAuthenticated && user?.role === "agent") return router.push("/dashboard/agent")
+    if (isAuthenticated && user?.role) return router.push(`/dashboard/${user.role}`)
+    return router.push(signupHref)
+  }
+
+  const goToRoleOrSignup = (signupHref: string) => {
+    if (isAuthenticated && user?.role) return router.push(`/dashboard/${user.role}`)
+    return router.push(signupHref)
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -61,7 +82,7 @@ export default function LandingPage() {
 
       {/* Hero */}
       <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,var(--color-primary)/0.08,transparent_60%)]" />
+        <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top,var(--color-primary)/0.08,transparent_60%)]" />
         <div className="mx-auto max-w-7xl px-6 pb-20 pt-24 lg:pt-32">
           <div className="mx-auto max-w-3xl text-center">
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-4 py-1.5 text-sm text-secondary-foreground">
@@ -79,24 +100,22 @@ export default function LandingPage() {
               fellow students. Fast, affordable, community-powered.
             </p>
             <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-              <Link href="/signup">
-                <Button
-                  size="lg"
-                  className="group rounded-2xl bg-primary px-8 text-primary-foreground hover:bg-primary/90"
-                >
-                  Order now
-                  <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
-                </Button>
-              </Link>
-              <Link href="/signup">
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="rounded-2xl px-8"
-                >
-                  Become a driver
-                </Button>
-              </Link>
+              <Button
+                size="lg"
+                onClick={() => goToCustomer()}
+                className="group rounded-2xl bg-primary px-8 text-primary-foreground hover:bg-primary/90"
+              >
+                Order now
+                <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+              </Button>
+              <Button
+                size="lg"
+                onClick={() => goToAgent()}
+                variant="outline"
+                className="rounded-2xl px-8"
+              >
+                Become a driver
+              </Button>
             </div>
 
             <div className="mt-14 flex flex-wrap items-center justify-center gap-8 text-sm text-muted-foreground">
@@ -253,14 +272,13 @@ export default function LandingPage() {
                     </li>
                   ))}
                 </ul>
-                <Link href={item.href}>
-                  <Button
-                    variant="outline"
-                    className="w-full rounded-xl transition-colors group-hover:bg-primary group-hover:text-primary-foreground"
-                  >
-                    Sign up as {item.role}
-                  </Button>
-                </Link>
+                <Button
+                  onClick={() => goToRoleOrSignup(item.href)}
+                  variant="outline"
+                  className="w-full rounded-xl transition-colors group-hover:bg-primary group-hover:text-primary-foreground"
+                >
+                  Sign up as {item.role}
+                </Button>
               </div>
             ))}
           </div>
@@ -327,7 +345,7 @@ export default function LandingPage() {
       <section className="py-24">
         <div className="mx-auto max-w-7xl px-6">
           <div className="relative overflow-hidden rounded-3xl bg-primary p-12 text-center lg:p-20">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,var(--color-accent)/0.15,transparent_50%)]" />
+            <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top_right,var(--color-accent)/0.15,transparent_50%)]" />
             <div className="relative">
               <h2 className="text-balance text-3xl font-bold text-primary-foreground lg:text-5xl">
                 Ready to eat?
@@ -337,14 +355,13 @@ export default function LandingPage() {
                 food delivery.
               </p>
               <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
-                <Link href="/signup">
-                  <Button
-                    size="lg"
-                    className="rounded-2xl bg-accent px-8 text-accent-foreground hover:bg-accent/90"
-                  >
-                    Get started free
-                  </Button>
-                </Link>
+                <Button
+                  size="lg"
+                  onClick={() => goToCustomer()}
+                  className="rounded-2xl bg-accent px-8 text-accent-foreground hover:bg-accent/90"
+                >
+                  Get started free
+                </Button>
               </div>
             </div>
           </div>

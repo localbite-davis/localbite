@@ -12,7 +12,7 @@ const API_URL = "http://localhost:8000/api/v1"
 export default function PaymentSuccessPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { isAuthenticated, isAuthLoading, user } = useAuth()
+  const { isAuthenticated, user, isAuthReady } = useAuth()
   const [status, setStatus] = useState<"loading" | "success" | "error">(
     "loading"
   )
@@ -23,76 +23,19 @@ export default function PaymentSuccessPage() {
   const orderIdFromQuery = searchParams.get("order_id") || searchParams.get("orderId")
 
   useEffect(() => {
-    const checkAndRedirect = async () => {
-      if (isAuthLoading) {
-        return
-      }
+    // Wait until auth initialization completes
+    if (!isAuthReady) return
 
-      if (isAuthenticated && user) {
-        if (!dispatchStartedRef.current) {
-          dispatchStartedRef.current = true
-          try {
-            const rawContext =
-              typeof window !== "undefined"
-                ? window.sessionStorage.getItem("pending_dispatch_context")
-                : null
-
-            const parsed = rawContext
-              ? (JSON.parse(rawContext) as {
-                  orderId?: string
-                  deliveryAddress?: string
-                })
-              : undefined
-
-            const parsedOrderId = Number(parsed?.orderId || orderIdFromQuery)
-            if (!Number.isFinite(parsedOrderId) || parsedOrderId <= 0) {
-              throw new Error(
-                "Payment succeeded but order ID was missing, so dispatch could not be started"
-              )
-            }
-
-            await startOrderDispatch(parsedOrderId, {
-              delivery_address:
-                parsed?.deliveryAddress || "Segundo Dining Commons, Davis, CA",
-              phase1_wait_seconds_min: 180,
-              phase1_wait_seconds_max: 180,
-              phase2_wait_seconds: 180,
-              poll_interval_seconds: 5,
-            })
-          } catch (err) {
-            console.error("Dispatch start failed:", err)
-            setError(
-              err instanceof Error
-                ? err.message
-                : "Payment succeeded, but dispatch failed to start"
-            )
-            setStatus("error")
-            return
-          } finally {
-            if (typeof window !== "undefined") {
-              window.sessionStorage.removeItem("pending_dispatch_context")
-            }
-          }
-        }
-
-        setStatus("success")
-        router.push("/dashboard/customer/orders")
-        return
-      }
-
-      if (!isAuthenticated) {
-        router.replace("/login")
-        return
-      }
-
-      setStatus("success")
-      setTimeout(() => {
-        router.push("/dashboard/customer/orders")
-      }, 1000)
+    // If not authenticated after auth is ready => send to login
+    if (!isAuthenticated) {
+      router.replace("/login")
+      return
     }
 
-    checkAndRedirect()
-  }, [isAuthenticated, isAuthLoading, user, router, orderIdFromQuery])
+    // Authenticated: show success then navigate to cart
+    setStatus("success")
+    router.push("/dashboard/customer/cart")
+  }, [isAuthReady, isAuthenticated, user, router])
 
   if (status === "loading") {
     return (
