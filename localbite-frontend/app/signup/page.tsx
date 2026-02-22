@@ -61,7 +61,7 @@ function SignupForm() {
       email,
       password,
       selectedRole,
-      selectedRole === "customer" ? studentId : selectedRole === "agent" ? agentType : undefined
+      selectedRole === "agent" ? agentType === "Student Agent" : undefined
     )
   }
 

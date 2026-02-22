@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Link from "next/link"
 import { useAuth } from "@/context/auth-context"
 import { useTheme } from "next-themes"
 import { agentStats } from "@/lib/mock-data"
